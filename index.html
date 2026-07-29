@@ -669,7 +669,7 @@ function goback(){
   if(prev){cur=prev;toggleFab(false);render();const p=$('#pages');if(p)p.scrollTop=0;window.scrollTo(0,0);}
 }
 function renderTabbar(){
-  $('#tabbar').innerHTML=TABS.map(t=>`<button class="tab-item ${cur===t.id?'on':''}" onclick="go('${t.id}',false)"><span class="ic">${t.ic}</span><span>${t.name}</span></button>`).join('');
+  $('#tabbar').innerHTML=TABS.map(t=>`<button class="tab-item ${cur===t.id?'on':''}" onclick="go('${t.id}',false)"><span class="ic">${S.quickIcons[t.id]||t.ic}</span><span>${t.name}</span></button>`).join('');
 }
 
 /* ================= 悬浮按钮 ================= */
