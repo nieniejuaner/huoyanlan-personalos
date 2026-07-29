@@ -629,7 +629,7 @@ function toggleTask(id){
 const TABS=[
   {id:'home',ic:'🏠',name:'首页'},
   {id:'study',ic:'✅',name:'任务'},
-  {id:'money',ic:'💰',name:'记账'},
+  {id:'money',ic:'💰',name:'账目'},
   {id:'shift',ic:'📅',name:'排班'},
   {id:'me',ic:'👤',name:'我的'}
 ];
@@ -803,7 +803,7 @@ function pageHome(){
     </div>
 
     <div class="card">
-      <div class="card-title">资金快照 <button class="btn-sm" style="color:#c98d88" onclick="go('money')">进入记账 ›</button></div>
+      <div class="card-title">资金快照 <button class="btn-sm" style="color:#c98d88" onclick="go('money')">进入账目 ›</button></div>
       <div class="acct-col">
         <div class="acct-box" style="background:var(--aqua)"><div class="a-left"><div class="a-name">🏦 存钱</div></div><div class="a-right"><div class="a-val">¥${fmt(b.save)}</div></div></div>
         <div class="acct-box" style="background:var(--line)"><div class="a-left"><div class="a-name">🧾 日常支出</div></div><div class="a-right"><div class="a-val">¥${fmt(b.daily)}</div></div></div>
@@ -852,7 +852,7 @@ function pageHome(){
       <div class="card-title">快捷入口 <button class="btn-sm" style="color:#c98d88" onclick="editQuickIcons()">✏️ 改图标</button></div>
       <div class="grid3">
         ${quickEntryBtn('study','任务','btn-aqua')}
-        ${quickEntryBtn('money','记账','btn-coral')}
+        ${quickEntryBtn('money','账目','btn-coral')}
         ${quickEntryBtn('shift','排班','btn-grass')}
       </div>
     </div>
@@ -1175,7 +1175,7 @@ function studyOverview(){
 }
 </script>
 <script>
-/* ================= Tab4 记账 ================= */
+/* ================= Tab4 账目 ================= */
 const CAT_IC={'餐饮':'🍜','交通':'🚌','购物':'🛍','居家':'🏡','医疗':'💊','娱乐':'🎮','美妆':'💄','奶茶咖啡':'🧋','游戏':'🕹','宠爱自己':'💝','工资':'💼','兼职':'🧑‍💻','理财':'📈','红包':'🧧','其他':'📦'};
 const catIc=c=>CAT_IC[c]||'📦';
 function billRow(e){
@@ -1289,7 +1289,7 @@ function pageMoney(){
   const sd=saveDetails();
   return `
   <div class="page-anim">
-    <div class="h1" style="margin:4px 2px 14px">💰 记账</div>
+    <div class="h1" style="margin:4px 2px 14px">💰 账目</div>
 
     <div class="card">
       <div class="card-title">账户总览 <span class="sub" style="font-weight:400">总余额 / 本月</span></div>
@@ -1868,7 +1868,7 @@ function quickEntryBtn(key,label,cls){
   return `<button class="btn ${cls}" onclick="go('${key}')"><span class="qe-ic" onclick="event.stopPropagation();pickQuickIcon('${key}')" title="点图标换图标">${esc(S.quickIcons[key]||'•')}</span> ${label}</button>`;
 }
 function editQuickIcons(){
-  const map={study:'任务',money:'记账',shift:'排班'};
+  const map={study:'任务',money:'账目',shift:'排班'};
   openModal(`<h3>快捷入口图标 <button class="x" onclick="closeModal()">✕</button></h3>
     <p class="sub">直接点击首页「快捷入口」里的图标即可更换。也可在下面逐个设置：</p>
     ${Object.keys(map).map(k=>`<div class="set-row" style="cursor:pointer" onclick="pickQuickIcon('${k}')"><span>${esc(S.quickIcons[k]||'•')} ${map[k]}</span><span class="sub">点击更换 ›</span></div>`).join('')}`);
