@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>火焰兰 PersonalOS · 设计方案预览</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,"SF Pro","PingFang SC",system-ui,sans-serif;background:#ececec;color:#222;padding:28px 16px 60px}
+h1{text-align:center;font-size:20px;font-weight:700;margin-bottom:4px}
+.sub{text-align:center;color:#888;font-size:12px;margin-bottom:26px}
+.wrap{display:flex;flex-wrap:wrap;gap:22px;justify-content:center}
+.col{display:flex;flex-direction:column;align-items:center;width:300px}
+.name{font-size:14px;font-weight:700;margin-bottom:4px}
+.desc{font-size:11px;color:#999;text-align:center;height:32px;margin-bottom:10px;line-height:1.4}
+
+/* 手机外框 */
+.phone{width:300px;height:620px;border-radius:40px;background:#f4deda;overflow:hidden;position:relative;border:9px solid #1c1c1e;box-shadow:0 14px 34px rgba(0,0,0,.18)}
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:20px;background:#1c1c1e;border-radius:0 0 14px 14px;z-index:5}
+.screen{padding:30px 16px 20px;height:100%;overflow:hidden;display:flex;flex-direction:column;gap:14px}
+
+/* 公共组件 */
+.greet{font-size:18px;font-weight:700;line-height:1.25}
+.date{font-size:11px;color:#9a8f8d;margin-top:3px}
+.ctitle{font-size:11px;color:#9a8f8d;letter-spacing:1px;font-weight:600;margin-bottom:2px}
+.accts{display:flex;gap:8px}
+.acct{flex:1;border-radius:14px;padding:10px 6px;text-align:center}
+.acct .n{font-size:9.5px;color:#8a7f7d}
+.acct .v{font-size:14px;font-weight:700;margin-top:3px}
+.acct .m{font-size:9px;color:#9a8f8d;margin-top:1px}
+.card{border-radius:16px;padding:13px}
+.task{display:flex;align-items:center;gap:9px;font-size:12px;padding:6px 0}
+.chk{width:15px;height:15px;border-radius:50%;border:1.6px solid #c9bdba;flex:none}
+.chk.on{background:#f1bfbc;border-color:#f1bfbc}
+.sched{display:flex;align-items:center;gap:9px;font-size:12px;padding:7px 0}
+.sdot{width:8px;height:8px;border-radius:50%;background:#9078ac;flex:none}
+.fab{position:absolute;right:16px;bottom:16px;width:48px;height:48px;border-radius:50%;background:#f1bfbc;color:#fff;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:300;box-shadow:0 6px 16px rgba(241,191,188,.6)}
+.swatches{display:flex;gap:5px;margin-top:14px}
+.sw{width:22px;height:22px;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+/* ===== 设计1：柔和圆润·呼吸感 ===== */
+.v1 .screen{background:#f4deda}
+.v1 .card{background:#fff;box-shadow:0 3px 14px rgba(241,191,188,.14)}
+.v1 .acct{background:#fff;box-shadow:0 3px 14px rgba(241,191,188,.12)}
+.v1 .acct:nth-child(1){background:#c4f3f0}.v1 .acct:nth-child(2){background:#dcf7d8}.v1 .acct:nth-child(3){background:#fde7e5}
+.v1 .card.alt{background:#fdeeed}
+
+/* ===== 设计2：杂志编辑风 ===== */
+.v2 .screen{background:#f4deda}
+.v2 .greet{font-size:24px;letter-spacing:.5px}
+.v2 .hero{background:#f1bfbc;color:#fff;border-radius:20px;padding:16px;margin-top:6px}
+.v2 .hero .big{font-size:22px;font-weight:800;line-height:1.2}
+.v2 .hero .small{font-size:11px;opacity:.92;margin-top:4px}
+.v2 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.v2 .acct{border-radius:16px;padding:11px 8px}
+.v2 .acct:nth-child(1){background:#c4f3f0}.v2 .acct:nth-child(2){background:#dcf7d8}.v2 .acct:nth-child(3){background:#fde7e5}
+.v2 .card{border-radius:16px;background:#fff}
+.v2 .card.alt{background:#c4f3f0}
+
+/* ===== 设计3：极简薄线风 ===== */
+.v3 .screen{background:#fbf3f1}
+.v3 .card{background:#fff;border:1px solid #f0ddd9;border-radius:12px;padding:11px 12px}
+.v3 .accts{display:flex;flex-direction:column;gap:0}
+.v3 .acct{display:flex;justify-content:space-between;align-items:center;text-align:left;border-radius:0;padding:10px 2px;border-bottom:1px solid #f3e3df;background:transparent;box-shadow:none}
+.v3 .acct:last-child{border-bottom:none}
+.v3 .acct .n{font-size:11px;color:#8a7f7d}
+.v3 .acct .v{font-size:14px;font-weight:700}
+.v3 .acct .m{display:none}
+.v3 .chk.on{background:#f1bfbc;border-color:#f1bfbc}
+.v3 .fab{background:#f1bfbc}
+
+/* ===== 设计4：新拟态·柔质感 ===== */
+.v4 .screen{background:#f4deda}
+.v4 .card{background:#f4deda;box-shadow:6px 6px 13px #e6ccC8,-6px -6px 13px #fff6f2;border-radius:20px}
+.v4 .accts{display:flex;flex-direction:column;gap:12px}
+.v4 .acct{border-radius:18px;padding:13px;display:flex;justify-content:space-between;align-items:center;text-align:left;background:#f4deda;box-shadow:5px 5px 11px #e6ccc8,-5px -5px 11px #fff6f2}
+.v4 .acct:nth-child(1){box-shadow:inset 4px 4px 9px #cfe9e6,inset -4px -4px 9px #fff}
+.v4 .acct:nth-child(2){box-shadow:inset 4px 4px 9px #d6eccf,inset -4px -4px 9px #fff}
+.v4 .acct:nth-child(3){box-shadow:inset 4px 4px 9px #f3d4d0,inset -4px -4px 9px #fff}
+.v4 .acct .n{font-size:11px;color:#8a7f7d}
+.v4 .acct .v{font-size:15px;font-weight:700}
+.v4 .acct .m{display:none}
+.v4 .chk.on{background:#f1bfbc;border-color:#f1bfbc}
+.v4 .fab{background:#f1bfbc;box-shadow:6px 6px 13px #e6ccc8,-4px -4px 10px #fff6f2}
+/* ===== 设计5：可爱贴纸手账风 ===== */
+.v5 .screen{background:#ffe6ea;gap:13px;padding:28px 14px 16px}
+.v5 .hero{background:linear-gradient(135deg,#ffb3c1,#ffd9c0);border:3px solid #c97b74;border-radius:22px;padding:14px 15px;color:#7a3b38;position:relative;overflow:hidden;box-shadow:5px 5px 0 #ffc2cb;transform:rotate(-1.2deg)}
+.v5 .hero .big{font-size:17px;font-weight:800;line-height:1.3}
+.v5 .hero .small{font-size:10.5px;margin-top:5px;font-weight:600}
+.v5 .hero .mascot{position:absolute;right:8px;bottom:1px;font-size:46px;transform:rotate(9deg)}
+.v5 .pill{display:inline-block;background:#fff;color:#c97b74;border:2.5px solid #c97b74;font-size:11px;font-weight:800;border-radius:999px;padding:3px 12px;box-shadow:3px 3px 0 #ffc2cb;transform:rotate(-1deg);margin-bottom:8px}
+.v5 .card{background:#fff;border:2.5px solid #c97b74;border-radius:20px;padding:14px;box-shadow:4px 4px 0 #ffc2cb}
+.v5 .accts{display:flex;gap:9px}
+.v5 .acct{border:2.5px solid #c97b74;border-radius:16px;padding:10px 5px 8px;text-align:center;box-shadow:3px 3px 0 #ffc2cb;position:relative}
+.v5 .acct:nth-child(1){background:#b8f1ec;transform:rotate(1.2deg)}
+.v5 .acct:nth-child(2){background:#cdf3c2;transform:rotate(-1deg)}
+.v5 .acct:nth-child(3){background:#ffd9c0;transform:rotate(1deg)}
+.v5 .acct .badge{position:absolute;top:-10px;right:-4px;font-size:16px}
+.v5 .acct .n{font-size:9.5px;color:#7a5a55;font-weight:700}
+.v5 .acct .v{font-size:13.5px;font-weight:800;margin-top:3px;color:#5a3a36}
+.v5 .acct .m{font-size:8px;color:#8a6a64;margin-top:1px;font-weight:600}
+.v5 .task{font-size:11.5px;padding:6px 0;font-weight:600;color:#5a3a36}
+.v5 .chk{width:17px;height:17px;border-radius:6px;border:2.5px solid #c97b74;flex:none;background:#fff}
+.v5 .chk.on{background:#ff9db0;border-color:#c97b74;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:900}
+.v5 .sched{font-size:11.5px;font-weight:600;color:#5a3a36}
+.v5 .sdot{background:#c97b74}
+.v5 .fab{background:#ff9db0;border:3px solid #c97b74;border-radius:50% 50% 50% 16px;box-shadow:4px 4px 0 #ffc2cb;color:#fff}
+.v5 .paw5{position:absolute;left:16px;bottom:76px;font-size:20px;transform:rotate(-12deg);opacity:.85;z-index:3}
+.v5 .stk{position:absolute;z-index:3;opacity:.82}
+.v5 .pawA{right:13px;top:96px;font-size:18px;transform:rotate(16deg)}
+.v5 .pawB{left:13px;top:312px;font-size:17px;transform:rotate(-18deg)}
+.v5 .bone{right:14px;top:474px;font-size:18px;transform:rotate(12deg)}
+.v5 .pup{left:15px;bottom:120px;font-size:20px;transform:rotate(-8deg)}
+.v5 .mascot-svg{position:absolute;right:6px;bottom:0;width:60px;height:60px;transform:rotate(6deg)}
+</style>
+</head>
+<body>
+<h1>火焰兰 PersonalOS · 设计方案预览</h1>
+<div class="sub">五套视觉方向，配色统一使用「火焰兰」默认主题（其余 4 套主题切换逻辑不变）。请挑选你最喜欢的一款。</div>
+
+<div class="wrap">
+
+  <!-- 设计1 -->
+  <div class="col">
+    <div class="name">① 柔和圆润 · 呼吸感</div>
+    <div class="desc">大圆角、多留白、淡阴影，温润高级，最接近现有风格但更精致。</div>
+    <div class="phone v1"><div class="notch"></div><div class="screen">
+      <div><div class="greet">你好，今天也要<br>好好生活 🌸</div><div class="date">2026年7月29日 周三</div></div>
+      <div><div class="ctitle">账户总览</div><div class="accts">
+        <div class="acct"><div class="n">🏦 存钱</div><div class="v">¥12,480</div><div class="m">本月 ¥2,100</div></div>
+        <div class="acct"><div class="n">🧾 日常</div><div class="v">¥3,210</div><div class="m">本月 ¥880</div></div>
+        <div class="acct"><div class="n">✨ 心情</div><div class="v">¥640</div><div class="m">本月 ¥200</div></div>
+      </div></div>
+      <div class="card"><div class="ctitle">今日任务</div>
+        <div class="task"><span class="chk on"></span>阅读《认知觉醒》30 分钟</div>
+        <div class="task"><span class="chk"></span>背 20 个单词</div>
+        <div class="task"><span class="chk on"></span>整理周报</div>
+      </div>
+      <div class="card alt"><div class="ctitle">今日排班</div>
+        <div class="sched"><span class="sdot"></span>早班 09:00 - 18:00 · 3号车间</div>
+      </div>
+    </div><div class="fab">＋</div></div>
+    <div class="swatches"><span class="sw" style="background:#f4deda"></span><span class="sw" style="background:#c4f3f0"></span><span class="sw" style="background:#dcf7d8"></span><span class="sw" style="background:#f1bfbc"></span></div>
+  </div>
+
+  <!-- 设计2 -->
+  <div class="col">
+    <div class="name">② 杂志编辑风</div>
+    <div class="desc">大字号标题 + 强色块，非对称排版，有杂志/潮牌的编排感。</div>
+    <div class="phone v2"><div class="notch"></div><div class="screen">
+      <div class="greet">火焰兰</div>
+      <div class="hero"><div class="big">你好，<br>今天也要好好生活</div><div class="small">2026.07.29 周三 · 距月底还有 2 天</div></div>
+      <div class="grid2">
+        <div class="acct"><div class="n">🏦 存钱</div><div class="v">¥12,480</div></div>
+        <div class="acct"><div class="n">🧾 日常</div><div class="v">¥3,210</div></div>
+        <div class="acct"><div class="n">✨ 心情</div><div class="v">¥640</div></div>
+        <div class="acct"><div class="n">📅 排班</div><div class="v">早班</div></div>
+      </div>
+      <div class="card"><div class="ctitle">今日任务</div>
+        <div class="task"><span class="chk on"></span>阅读《认知觉醒》</div>
+        <div class="task"><span class="chk"></span>背 20 个单词</div>
+      </div>
+      <div class="card alt"><div class="ctitle">今日排班</div>
+        <div class="sched"><span class="sdot"></span>早班 09:00-18:00</div>
+      </div>
+    </div><div class="fab">＋</div></div>
+    <div class="swatches"><span class="sw" style="background:#f4deda"></span><span class="sw" style="background:#c4f3f0"></span><span class="sw" style="background:#dcf7d8"></span><span class="sw" style="background:#f1bfbc"></span></div>
+  </div>
+
+  <!-- 设计3 -->
+  <div class="col">
+    <div class="name">③ 极简薄线风</div>
+    <div class="desc">发丝级描边、大量留白、仅关键处用珊瑚色点缀，安静克制。</div>
+    <div class="phone v3"><div class="notch"></div><div class="screen">
+      <div><div class="greet">你好，今天也要好好生活</div><div class="date">2026年7月29日 周三</div></div>
+      <div class="ctitle">账户总览</div>
+      <div class="card" style="padding:4px 12px">
+        <div class="acct"><span class="n">🏦 存钱</span><span class="v">¥12,480</span></div>
+        <div class="acct"><span class="n">🧾 日常支出</span><span class="v">¥3,210</span></div>
+        <div class="acct"><span class="n">✨ 为心情买单</span><span class="v">¥640</span></div>
+      </div>
+      <div class="card"><div class="ctitle">今日任务</div>
+        <div class="task"><span class="chk on"></span>阅读《认知觉醒》30 分钟</div>
+        <div class="task"><span class="chk"></span>背 20 个单词</div>
+        <div class="task"><span class="chk on"></span>整理周报</div>
+      </div>
+      <div class="card"><div class="ctitle">今日排班</div>
+        <div class="sched"><span class="sdot"></span>早班 09:00 - 18:00</div>
+      </div>
+    </div><div class="fab">＋</div></div>
+    <div class="swatches"><span class="sw" style="background:#f4deda"></span><span class="sw" style="background:#c4f3f0"></span><span class="sw" style="background:#dcf7d8"></span><span class="sw" style="background:#f1bfbc"></span></div>
+  </div>
+
+  <!-- 设计4 -->
+  <div class="col">
+    <div class="name">④ 新拟态 · 柔质感</div>
+    <div class="desc">柔和立体凸起/凹陷面，像奶油般温润可触，亲和治愈。</div>
+    <div class="phone v4"><div class="notch"></div><div class="screen">
+      <div><div class="greet">你好，今天也要好好生活</div><div class="date">2026年7月29日 周三</div></div>
+      <div class="ctitle">账户总览</div>
+      <div class="accts">
+        <div class="acct"><span class="n">🏦 存钱</span><span class="v">¥12,480</span></div>
+        <div class="acct"><span class="n">🧾 日常支出</span><span class="v">¥3,210</span></div>
+        <div class="acct"><span class="n">✨ 心情</span><span class="v">¥640</span></div>
+      </div>
+      <div class="card"><div class="ctitle">今日任务</div>
+        <div class="task"><span class="chk on"></span>阅读《认知觉醒》30 分钟</div>
+        <div class="task"><span class="chk"></span>背 20 个单词</div>
+        <div class="task"><span class="chk on"></span>整理周报</div>
+      </div>
+      <div class="card"><div class="ctitle">今日排班</div>
+        <div class="sched"><span class="sdot"></span>早班 09:00 - 18:00</div>
+      </div>
+    </div><div class="fab">＋</div></div>
+    <div class="swatches"><span class="sw" style="background:#f4deda"></span><span class="sw" style="background:#c4f3f0"></span><span class="sw" style="background:#dcf7d8"></span><span class="sw" style="background:#f1bfbc"></span></div>
+  </div>
+
+  <!-- 设计5 -->
+  <div class="col">
+    <div class="name">⑤ 可爱贴纸手账风</div>
+    <div class="desc">纯色背景(无波点) + 粗描边硬投影贴纸感 + 更跳配色 + 无 mascot + 满屏小狗元素(🐾爪印/🦴骨头/🐶脸贴纸)。</div>
+    <div class="phone v5"><div class="notch"></div><div class="screen">
+      <div class="hero"><div class="big">🌸 你好呀，<br>今天也要开心哦</div><div class="small">📆 2026.07.29 周三 · 距月底 2 天</div></div>
+      <div><span class="pill">💰 账户总览</span><div class="accts">
+        <div class="acct"><span class="badge">🏦</span><div class="n">存钱</div><div class="v">¥12,480</div><div class="m">🌟 ¥2,100</div></div>
+        <div class="acct"><span class="badge">🧾</span><div class="n">日常</div><div class="v">¥3,210</div><div class="m">🌟 ¥880</div></div>
+        <div class="acct"><span class="badge">✨</span><div class="n">心情</div><div class="v">¥640</div><div class="m">🌟 ¥200</div></div>
+      </div></div>
+      <div class="card"><span class="pill">✅ 今日任务</span>
+        <div class="task"><span class="chk on">✓</span>📖 阅读《认知觉醒》30 分钟</div>
+        <div class="task"><span class="chk"></span>🗣️ 背 20 个单词</div>
+        <div class="task"><span class="chk on">✓</span>📝 整理周报</div>
+      </div>
+      <div class="card"><span class="pill">📅 今日排班</span>
+        <div class="sched"><span class="sdot"></span>🌞 早班 09:00 - 18:00 · 3号车间</div>
+      </div>
+    </div><div class="paw5">🐾</div><div class="stk pawA">🐾</div><div class="stk pawB">🐾</div><div class="stk bone">🦴</div><div class="stk pup">🐶</div><div class="fab">✨</div></div>
+    <div class="swatches"><span class="sw" style="background:#ffe6ea"></span><span class="sw" style="background:#b8f1ec"></span><span class="sw" style="background:#cdf3c2"></span><span class="sw" style="background:#ff9db0"></span></div>
+  </div>
+
+</div>
+</body>
+</html>
