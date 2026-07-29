@@ -294,6 +294,8 @@ input,select,textarea{border:2.5px solid var(--outline);box-shadow:3px 3px 0 var
 .amt-in{color:#3aa79f}
 .amt-out{color:#e0908b}
 .bill-imp .sub{flex:none}
+.ov-search{flex:1;min-width:0;padding:9px 12px;border:2.5px solid var(--outline);border-radius:var(--r-btn);background:var(--card);font-size:14px;outline:none;box-sizing:border-box}
+.ov-search:focus{border-color:var(--coral)}
 </style>
 </head>
 <body>
@@ -653,6 +655,8 @@ let studyView='today';
 let ovFilter='all';
 let ovCalMonth='';
 let ovCalSel='';
+let ovDate='';
+let ovSearch='';
 let giftTab='in';
 let giftQuery='';
 let giftSel={};
@@ -1114,7 +1118,7 @@ function toggleTaskOn(id,ds){
   if(i>=0)S.taskDone[ds].splice(i,1);else S.taskDone[ds].push(id);
   commit();
 }
-function ovSelDay(ds){ovCalSel=ds;render();}
+function ovSelDay(ds){ovCalSel=ds;ovDate=(ovDate===ds)?'':ds;render();}
 function ovDayItem(t,ds){
   const done=isDone(t.id,ds);
   return `
@@ -1133,7 +1137,7 @@ function ovDayItem(t,ds){
 function ovCalCard(){
   const cells=monthMatrix(ovYM()),[y,m]=ovYM().split('-').map(Number),todayStr=today();
   if(!ovCalSel)ovCalSel=todayStr;
-  const sel=ovCalSel;
+  const sel=ovDate||ovCalSel;
   return `
   <div class="card cal-mini">
     <div class="row" style="margin-bottom:4px">
@@ -1159,16 +1163,33 @@ function ovCalCard(){
     <div class="sub" style="text-align:center;padding-top:6px">点选日期后可在该日添加任务</div>
   </div>`;
 }
-function studyOverview(){
-  const all=S.tasks.slice().sort((a,b)=>{
+function ovListData(){
+  let list=ovDate?tasksForDate(ovDate):S.tasks.slice();
+  if(ovFilter==='todo')list=list.filter(t=>!t.endedDate);
+  if(ovFilter==='done')list=list.filter(t=>!!t.endedDate);
+  const q=(ovSearch||'').trim();
+  if(q)list=list.filter(t=>(t.title||'').includes(q)||(t.type==='repeat'?repeatLabel(t):'').includes(q)||(t.note||'').includes(q));
+  list.sort((a,b)=>{
     const ea=!!a.endedDate,eb=!!b.endedDate;
     if(ea!==eb)return ea?1:-1;
     return (b.createdDate||'').localeCompare(a.createdDate||'');
-  }).filter(t=>{
-    if(ovFilter==='todo')return !t.endedDate;
-    if(ovFilter==='done')return !!t.endedDate;
-    return true;
   });
+  return list;
+}
+function ovListHTML(){
+  const list=ovListData();
+  return list.length?list.map(overviewItem).join(''):`<div class="empty">${ovDate?'该日暂无任务':'没有匹配的任务'}</div>`;
+}
+function ovCountText(){
+  const n=ovListData().length;
+  if(ovDate)return n+' 个当日任务';
+  return '共 '+n+' 个任务';
+}
+function ovRenderList(){
+  const box=$('#ovList');if(box)box.innerHTML=ovListHTML();
+  const c=$('#ovCount');if(c)c.textContent=ovCountText();
+}
+function studyOverview(){
   return `
   <div class="page-anim">
     <div class="seg" style="margin:4px 2px 14px">
@@ -1181,8 +1202,12 @@ function studyOverview(){
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:14px;font-weight:600">共 ${S.tasks.length} 个任务</span>
-        <span class="sub">含已终止 · 可增删</span>
+        <span style="font-size:14px;font-weight:600" id="ovCount">${ovCountText()}</span>
+        <span class="sub">${ovDate?('📅 '+ovDate):'含已终止 · 可增删'}</span>
+      </div>
+      <div class="row" style="gap:8px;margin-bottom:8px">
+        <input class="ov-search" placeholder="🔍 搜索任务关键词" value="${esc(ovSearch)}" oninput="ovSearch=this.value;ovRenderList()">
+        ${ovDate?`<button class="btn btn-ghost btn-sm" style="padding:6px 10px;white-space:nowrap" onclick="ovDate='';render()">✕ 全部</button>`:''}
       </div>
       <div class="seg mt12">
         <button class="${ovFilter==='all'?'on':''}" onclick="ovFilter='all';render()">全部</button>
@@ -1191,7 +1216,7 @@ function studyOverview(){
       </div>
     </div>
     <div class="card">
-      ${all.length?all.map(overviewItem).join(''):`<div class="empty">还没有任何任务</div>`}
+      <div id="ovList">${ovListHTML()}</div>
     </div>
     <div class="sub" style="text-align:center;padding:4px 0 10px">点击「编辑」修改 · 点击「删除」移除任务</div>
     ${ovCalCard()}
