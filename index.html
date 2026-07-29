@@ -1813,7 +1813,8 @@ function pageMe(){
 
     <div class="card">
       <div class="card-title">数据管理</div>
-      <div class="set-row" onclick="exportData()" style="cursor:pointer"><span>📤 导出全部账单 / 台账</span><span class="sub">›</span></div>
+      <div class="set-row" onclick="exportAllBills()" style="cursor:pointer"><span>📤 导出全部账单 / 台账</span><span class="sub">Excel ›</span></div>
+      <div class="set-row" onclick="exportData()" style="cursor:pointer"><span>📦 导出全部数据备份</span><span class="sub">JSON ›</span></div>
       <div class="set-row" onclick="clearImages()" style="cursor:pointer"><span>🧹 清除缓存图片</span><span class="sub">›</span></div>
       <div class="set-row" onclick="resetData()" style="cursor:pointer;color:#e0908b"><span>⚠️ 重置数据</span><span class="sub">›</span></div>
     </div>
@@ -1887,6 +1888,16 @@ function chooseQuickIcon(e){
   save();closeModal();render();toast('图标已更新');
 }
 
+function exportAllBills(){
+  const toInc=i=>({kind:'income',amt:Number(i.total)||0,account:'收入',category:i.category||'',date:i.date||'',note:i.note||''});
+  const toExp=e=>({kind:'expense',amt:-(Number(e.amount)||0),account:e.account==='mood'?'心情':'日常',category:e.category||'',date:e.date||'',note:e.note||''});
+  const set=[...S.incomes.map(toInc),...S.expenses.map(toExp)];
+  if(!set.length){toast('还没有账单记录');return;}
+  set.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const rows=set.map(x=>[x.kind==='income'?'收入':'支出',x.account,x.category,x.date,(x.amt>=0?'+':'-')+fmt(Math.abs(x.amt)),x.note||'']);
+  downloadExcel('PersonalOS-全部账单台账-'+today(),['类型','账户','分类','日期','金额','备注'],rows);
+  toast('已导出 '+set.length+' 条账单');
+}
 function exportData(){
   const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
   const a=document.createElement('a');
