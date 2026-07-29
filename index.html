@@ -281,6 +281,19 @@ input,select,textarea{border:2.5px solid var(--outline);box-shadow:3px 3px 0 var
 @media (orientation:landscape){
   .float-win{width:236px}
 }
+/* ================= 账单导入预览 ================= */
+.bill-imp{display:flex;align-items:center;gap:10px;padding:9px 8px;border-bottom:1px solid var(--line);font-size:14px}
+.bill-imp.dup{opacity:.5}
+.bill-imp input[type=checkbox]{width:18px;height:18px;flex:none}
+.bi-dir{flex:none;width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff}
+.bi-dir.in{background:#3aa79f}
+.bi-dir.out{background:#e0908b}
+.bi-main{flex:1;min-width:0}
+.bi-main b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bi-amt{flex:none;font-weight:700}
+.amt-in{color:#3aa79f}
+.amt-out{color:#e0908b}
+.bill-imp .sub{flex:none}
 </style>
 </head>
 <body>
@@ -1289,7 +1302,10 @@ function pageMoney(){
   const sd=saveDetails();
   return `
   <div class="page-anim">
-    <div class="h1" style="margin:4px 2px 14px">💰 账目</div>
+    <div class="row" style="margin:4px 2px 14px">
+      <div class="h1 grow">💰 账目</div>
+      <button class="btn btn-grass btn-sm" style="padding:8px 14px" onclick="importBillModal()">📥 导入账单</button>
+    </div>
 
     <div class="card">
       <div class="card-title">账户总览 <span class="sub" style="font-weight:400">总余额 / 本月</span></div>
@@ -1759,6 +1775,190 @@ function applyShiftImport(arr,monthPrefix,img){
   arr=(arr||[]).filter(x=>x&&x.sdate).map(x=>({id:uid(),sdate:String(x.sdate).slice(0,10),stime:x.stime||'',edate:String(x.edate||x.sdate).slice(0,10),etime:x.etime||'',type:SHIFT_TYPES.find(t=>t.key===x.type)?x.type:'早班',note:x.note||'',img:img||'',date:String(x.sdate).slice(0,10),start:x.stime||'',end:x.etime||''}));
   if(!arr.length){toast('没有解析到排班，换种写法试试？');return;}
   S.shifts.push(...arr);window._shImpImg='';closeModal();commit();toast('已导入 '+arr.length+' 条排班');
+}
+
+/* ================= 账单导入（微信/支付宝 CSV） ================= */
+function importBillModal(){
+  openModal(`<h3>📥 导入账单 <button class="x" onclick="closeModal()">✕</button></h3>
+    <p class="sub">支持微信支付、支付宝导出的账单（CSV）。可粘贴文本或上传文件，自动识别来源与收/支方向，并按交易单号去重。</p>
+    <div class="f-label">来源（识别不准时可手动指定）</div>
+    <div class="seg" id="billSrc">
+      <button class="on" onclick="pickBillSrc('auto')">自动</button>
+      <button onclick="pickBillSrc('wx')">微信支付</button>
+      <button onclick="pickBillSrc('ali')">支付宝</button>
+    </div>
+    <div class="f-label mt12">支出归入账户</div>
+    <div class="seg" id="billAcct">
+      <button class="on" onclick="pickBillAcct('daily')">🧾 日常支出</button>
+      <button onclick="pickBillAcct('mood')">✨ 心情</button>
+    </div>
+    <div class="f-label mt12">账单内容（粘贴 CSV 文本，或从微信/支付宝导出后上传）</div>
+    <textarea id="billText" placeholder="粘贴微信/支付宝账单 CSV 内容，或下方选择文件…"></textarea>
+    <div class="f-label mt8">上传 CSV / TXT 文件</div>
+    <input id="billFile" type="file" accept=".csv,.txt,text/csv,text/plain">
+    <button class="btn btn-ghost btn-block mt12" onclick="previewBills()">解析预览</button>
+    <div id="billPreview"></div>`);
+  window._billSrc='auto';window._billAcct='daily';window._billItems=null;
+}
+function pickBillSrc(s){window._billSrc=s;segOn('billSrc',s==='auto'?'自动':(s==='wx'?'微信支付':'支付宝'),['自动','微信支付','支付宝']);}
+function pickBillAcct(a){window._billAcct=a;segOn('billAcct',a==='daily'?'🧾 日常支出':'✨ 心情',['🧾 日常支出','✨ 心情']);}
+function segOn(id,label,labels){const box=$('#'+id);if(!box)return;[...box.querySelectorAll('button')].forEach((b,i)=>b.classList.toggle('on',labels[i]===label));}
+function previewBills(){
+  const file=$('#billFile').files[0];
+  if(file){decodeBillFile(file).then(t=>{$('#billText').value=t;_doPreview($('#billText').value);}).catch(()=>toast('读取文件失败'));return;}
+  const txt=$('#billText').value.trim();
+  if(!txt){toast('请粘贴文本或选择文件');return;}
+  _doPreview(txt);
+}
+function decodeBillFile(file){
+  return file.arrayBuffer().then(buf=>{
+    const u8=new Uint8Array(buf);
+    if(u8[0]===0xEF&&u8[1]===0xBB&&u8[2]===0xBF)return new TextDecoder('utf-8').decode(buf);
+    let s=new TextDecoder('utf-8',{fatal:false}).decode(buf);
+    if(/�/.test(s))s=new TextDecoder('gbk',{fatal:false}).decode(buf);
+    return s;
+  });
+}
+function _doPreview(txt){
+  const r=parseBillText(txt,window._billSrc||'auto');
+  window._billItems=r.items;
+  const box=$('#billPreview');
+  if(!r.items.length){box.innerHTML=`<div class="empty">未解析到账单记录，请确认是微信/支付宝导出的 CSV，或手动指定来源</div>`;return;}
+  const existExt=new Set();
+  S.expenses.forEach(e=>{if(e.extId)existExt.add(e.extId);});
+  S.incomes.forEach(i=>{if(i.extId)existExt.add(i.extId);});
+  let html=`<div class="sub mt12">识别为 <b>${esc(r.source)}</b> · 共 ${r.items.length} 条（支出 ${r.expN} / 收入 ${r.incN}）· 取消勾选可跳过某条</div>`;
+  html+=r.items.map((it,idx)=>{
+    const dup=it.extId&&existExt.has(it.extId);
+    return `<label class="bill-imp${dup?' dup':''}">
+      <input type="checkbox" data-i="${idx}" ${dup?'':'checked'} ${dup?'disabled':''}>
+      <span class="bi-dir ${it.dir==='income'?'in':'out'}">${it.dir==='income'?'收':'支'}</span>
+      <span class="bi-main"><b>${esc(it.name||'—')}</b><div class="sub">${esc(it.date)} · ${esc(it.cat)}</div></span>
+      <span class="bi-amt ${it.dir==='income'?'amt-in':'amt-out'}">${it.dir==='income'?'+':'-'}${fmt(it.amt)}</span>
+      ${dup?'<span class="sub">已存在</span>':''}
+    </label>`;
+  }).join('');
+  html+=`<div class="grid2 mt12"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-coral" onclick="doImportBills()">导入选中</button></div>`;
+  box.innerHTML=html;
+}
+function doImportBills(){
+  const items=window._billItems;if(!items||!items.length){toast('没有可导入的项');return;}
+  const acct=window._billAcct||'daily';
+  const checks=document.querySelectorAll('#billPreview input[type=checkbox]:checked');
+  const want=new Set([...checks].map(c=>+c.dataset.i));
+  const existExt=new Set();
+  S.expenses.forEach(e=>{if(e.extId)existExt.add(e.extId);});
+  S.incomes.forEach(i=>{if(i.extId)existExt.add(i.extId);});
+  let nAdd=0;
+  items.forEach((it,idx)=>{
+    if(!want.has(idx))return;
+    if(it.extId&&existExt.has(it.extId))return;
+    const note=(it.name+' '+(it.note||'')).trim();
+    if(it.dir==='income'){
+      S.incomes.push({id:uid(),ts:Date.now(),date:it.date,total:it.amt,alloc:{save:0,daily:it.amt,mood:0},category:it.cat,note,img:'',extId:it.extId||''});
+    }else{
+      S.expenses.push({id:uid(),ts:Date.now(),date:it.date,amount:it.amt,account:acct,category:it.cat,note,img:'',extId:it.extId||''});
+    }
+    if(it.extId)existExt.add(it.extId);
+    nAdd++;
+  });
+  if(!nAdd){toast('没有新增（可能都已导入过）');return;}
+  closeModal();commit();toast('已导入 '+nAdd+' 条账单');
+}
+function parseCSVLine(line){
+  const out=[];let cur='';let q=false;
+  for(let i=0;i<line.length;i++){
+    const c=line[i];
+    if(q){
+      if(c==='"'){if(line[i+1]==='"'){cur+='"';i++;}else q=false;}
+      else cur+=c;
+    }else{
+      if(c===','){out.push(cur);cur='';}
+      else if(c==='"'){q=true;}
+      else cur+=c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+function cleanDate(s){
+  s=(s||'').trim().replace(/\//g,'-');
+  const m=s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  return m?m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0'):'';
+}
+function cleanAmt(s){const n=parseFloat(String(s||'').replace(/[¥￥,\s]/g,''));return isNaN(n)?0:n;}
+function guessCat(name,isIncome){
+  const n=String(name||'');
+  if(isIncome){
+    if(/红包|奖励/.test(n))return '红包';
+    if(/工资|薪酬|薪资|公积金|个税/.test(n))return '工资';
+    if(/理财|基金|股票|利息|收益|分红/.test(n))return '理财';
+    if(/兼职|外包|稿费|劳务/.test(n))return '兼职';
+    return '其他';
+  }
+  const map=[['餐饮',['餐饮','星巴克','麦当劳','肯德基','吃饭','食堂','外卖','美团','饿了么','咖啡','奶茶','餐厅','饭店','小吃','烘焙','甜']],
+    ['交通',['交通','滴滴','地铁','公交','加油','停车','高铁','火车','机票','打车','出租','12306','携程','滴滴出行']],
+    ['购物',['购物','淘宝','天猫','京东','拼多多','超市','便利店','商城','服饰','鞋','包','网购']],
+    ['居家',['居家','物业','水电','房租','家居','日用','日用百货']],
+    ['医疗',['医疗','医院','诊所','体检','保险','药','健']]];
+  for(const [cat,kws] of map)if(kws.some(k=>n.includes(k)))return cat;
+  return '其他';
+}
+function parseBillText(txt,src){
+  const raw=txt.split(/\r?\n/).map(l=>l.replace(/^﻿/,''));
+  const lines=raw.map(l=>l.trim()).filter(Boolean);
+  let hi=-1,source='未知';
+  const wxH=lines.findIndex(l=>/交易时间/.test(l)&&/收\/支/.test(l));
+  const aliH=lines.findIndex(l=>/(交易创建时间|交易号)/.test(l)&&/收\/支|金额/.test(l));
+  if((src==='ali')||(src!=='wx'&&aliH>=0)){hi=aliH;source='支付宝';}
+  else if((src==='wx')||wxH>=0){hi=wxH;source='微信支付';}
+  if(hi<0)return parseBillPlain(lines);
+  const cols=parseCSVLine(lines[hi]);
+  const idx=re=>{for(let i=0;i<cols.length;i++)if(re.test(cols[i]))return i;return -1;};
+  const timeI=idx(/交易时间|付款时间|创建时间/);
+  const dirI=idx(/收\/支/);
+  const amtI=idx(/金额/);
+  const nameI=(()=>{let n=idx(/交易对方/);if(n<0)n=idx(/商品名称/);if(n<0)n=idx(/商品/);return n;})();
+  const noteI=idx(/备注/);
+  const tidI=Math.max(idx(/交易单号/),idx(/交易号/),idx(/商家订单号/));
+  const items=[];let expN=0,incN=0;
+  for(let i=hi+1;i<lines.length;i++){
+    const ln=lines[i];
+    if(/^[-=]+$/.test(ln)||/共\s*\d|记录数|笔.*交易|导出时间|申请时间|记账时间/.test(ln))continue;
+    const c=parseCSVLine(ln);
+    if(c.length<3)continue;
+    const ds=cleanDate(timeI>=0?c[timeI]:c[0]);
+    const dirRaw=dirI>=0?c[dirI]:'';
+    let dir=null;
+    if(/支出/.test(dirRaw))dir='expense';
+    else if(/收入/.test(dirRaw))dir='income';
+    else continue;
+    const amt=cleanAmt(amtI>=0?c[amtI]:c[c.length-1]);
+    if(!(amt>0)||!ds)continue;
+    const name=(nameI>=0?c[nameI]:c[2]||'').trim()||'账单导入';
+    const note=(noteI>=0?c[noteI]:'').trim();
+    const extId=(tidI>=0?c[tidI]:'').trim();
+    const cat=guessCat(name,dir==='income');
+    items.push({dir,date:ds,amt,name,note,extId,cat});
+    dir==='income'?incN++:expN++;
+  }
+  return {items,source,expN,incN};
+}
+function parseBillPlain(lines){
+  const items=[];let expN=0,incN=0;
+  lines.forEach(ln=>{
+    const ds=cleanDate(ln);if(!ds)return;
+    let dir=null;
+    if(/支出|转出|付款|消费|支/.test(ln))dir='expense';
+    else if(/收入|转入|收款|入账|红包|收/.test(ln))dir='income';
+    const m=ln.match(/[¥￥]?\s*(\d[\d,]*\.?\d*)/);
+    const amt=cleanAmt(m?m[1]:'');
+    if(!dir||!(amt>0))return;
+    const name=(ln.replace(/[¥￥]/g,'').replace(/\d[\d,\.]*\d?/g,'').replace(/支出|收入|转入|转出|付款|收款|消费|入账|红包|支|收/g,'').replace(/\s+/g,'')).slice(0,20)||'账单';
+    items.push({dir,date:ds,amt,name,note:'',extId:'',cat:guessCat(name,dir==='income')});
+    dir==='income'?incN++:expN++;
+  });
+  return {items,source:'文本',expN,incN};
 }
 
 function pageMe(){
