@@ -72,6 +72,10 @@ textarea{resize:none;min-height:72px}
 .fab-menu{position:fixed;right:18px;bottom:calc(148px + env(safe-area-inset-bottom));z-index:70;display:flex;flex-direction:column;gap:9px;align-items:flex-end;opacity:0;pointer-events:none;transform:translateY(10px);transition:all .2s}
 .fab-menu.show{opacity:1;pointer-events:auto;transform:none}
 .fab-menu button{background:var(--card);border-radius:var(--r-btn);padding:10px 16px;font-size:14px;font-weight:600;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px}
+.fab-menu.center{display:flex;flex-direction:row;gap:20px;align-items:flex-start}
+.fab-menu.center .fab-col{display:flex;flex-direction:column;gap:9px}
+.fab-menu.center .fab-col-l{align-items:flex-start}
+.fab-menu.center .fab-col-r{align-items:flex-end}
 /* 按钮 */
 .btn{border-radius:var(--r-btn);padding:11px 18px;font-size:14.5px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .btn-coral{background:var(--coral);color:#fff}
@@ -687,8 +691,17 @@ const FAB_ACTS=[
   {ic:'🤖',name:'AI即时提问',fn:'goAsk()'},
   {ic:'📌',name:'悬浮速记',fn:'toggleFloatWin()'}
 ];
-function renderFab(){
-  $('#fabMenu').innerHTML=FAB_ACTS.map(a=>`<button onclick="toggleFab(false);${a.fn}"><span>${a.ic}</span>${a.name}</button>`).join('');
+function fabBtn(a){return `<button onclick="toggleFab(false);${a.fn}"><span>${a.ic}</span>${a.name}</button>`;}
+function renderFab(){renderFabMenuCols('auto');}
+function renderFabMenuCols(mode){
+  const m=$('#fabMenu');if(!m)return;
+  if(mode==='center'){
+    const half=Math.ceil(FAB_ACTS.length/2);
+    m.innerHTML=`<div class="fab-col fab-col-l">${FAB_ACTS.slice(0,half).map(fabBtn).join('')}</div>`
+               +`<div class="fab-col fab-col-r">${FAB_ACTS.slice(half).map(fabBtn).join('')}</div>`;
+  }else{
+    m.innerHTML=FAB_ACTS.map(fabBtn).join('');
+  }
 }
 function toggleFab(force){
   const open=force!==undefined?force:!$('#fab').classList.contains('open');
@@ -745,19 +758,30 @@ function placeFab(){
 }
 function updateFabMenuAnchor(){
   const f=$('#fab'),m=$('#fabMenu');if(!f||!m)return;const w=f.offsetWidth||54,h=f.offsetHeight||54;
-  const leftHalf=(f.offsetLeft+w/2)<window.innerWidth/2;
-  if(leftHalf){
-    // 在左侧半区：展开内容向右、左对齐
+  const cx=f.offsetLeft+w/2,cy=f.offsetTop+h/2,midX=window.innerWidth/2,midY=window.innerHeight/2;
+  const band=window.innerWidth*0.12; // 中央带状区判定
+  const centerH=Math.abs(cx-midX)<=band;
+  const mode=centerH?'center':(cx<midX?'left':'right');
+  if(m._fabMode!==mode){m._fabMode=mode;renderFabMenuCols(mode);}
+  // 重置可能残留的水平定位
+  m.style.left='';m.style.right='';m.style.transform='';m.style.maxWidth='';m.style.alignItems='';
+  m.classList.toggle('center',centerH);
+  if(centerH){
+    // 中央：两列布局，整块水平居中
+    m.style.left='50%';m.style.transform='translateX(-50%)';
+    m.style.maxWidth=(window.innerWidth-16)+'px';
+  }else if(mode==='left'){
+    // 左侧半区：向右展开、左对齐
     m.style.left=f.offsetLeft+'px';m.style.right='auto';
     m.style.alignItems='flex-start';
     m.style.maxWidth=(window.innerWidth-f.offsetLeft-8)+'px';
   }else{
-    // 在右侧半区：展开内容向左、右对齐（默认）
+    // 右侧半区：向左展开、右对齐
     m.style.right=(window.innerWidth-(f.offsetLeft+w))+'px';m.style.left='auto';
     m.style.alignItems='flex-end';
     m.style.maxWidth=(f.offsetLeft+w-8)+'px';
   }
-  const topHalf=(f.offsetTop+h/2)<window.innerHeight/2;
+  const topHalf=cy<midY;
   if(topHalf){
     m.style.top=(f.offsetTop+h+8)+'px';m.style.bottom='auto';
     m.style.maxHeight=(window.innerHeight-f.offsetTop-h-16)+'px';
