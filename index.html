@@ -741,7 +741,18 @@ function placeFab(){
 }
 function updateFabMenuAnchor(){
   const f=$('#fab'),m=$('#fabMenu');if(!f||!m)return;const w=f.offsetWidth||54,h=f.offsetHeight||54;
-  m.style.right=(window.innerWidth-(f.offsetLeft+w))+'px';
+  const leftHalf=(f.offsetLeft+w/2)<window.innerWidth/2;
+  if(leftHalf){
+    // 在左侧半区：展开内容向右、左对齐
+    m.style.left=f.offsetLeft+'px';m.style.right='auto';
+    m.style.alignItems='flex-start';
+    m.style.maxWidth=(window.innerWidth-f.offsetLeft-8)+'px';
+  }else{
+    // 在右侧半区：展开内容向左、右对齐（默认）
+    m.style.right=(window.innerWidth-(f.offsetLeft+w))+'px';m.style.left='auto';
+    m.style.alignItems='flex-end';
+    m.style.maxWidth=(f.offsetLeft+w-8)+'px';
+  }
   const topHalf=(f.offsetTop+h/2)<window.innerHeight/2;
   if(topHalf){
     m.style.top=(f.offsetTop+h+8)+'px';m.style.bottom='auto';
