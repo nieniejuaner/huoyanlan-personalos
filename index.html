@@ -2137,7 +2137,11 @@ function pageMoney(){
     </div>
 
     <div class="card">
-      <div class="card-title">🎁 份子钱专项台账 <span class="sub" style="font-weight:400">送出从存钱账户扣减</span></div>
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div class="card-title" style="margin:0">🎁 份子钱专项台账</div>
+        <button class="btn-sm" onclick="go('gift')">进入完整台账 ›</button>
+      </div>
+      <div class="sub" style="margin:0 0 8px">送出从存钱账户扣减</div>
       <div class="seg" style="margin-bottom:6px">
         <button class="${giftTab==='in'?'on':''}" style="${giftTab==='in'?'color:#1f5b57':''}" onclick="giftTab='in';render()">收到份子钱</button>
         <button class="${giftTab==='out'?'on':''}" style="${giftTab==='out'?'color:#c98d88':''}" onclick="giftTab='out';render()">送出份子钱</button>
@@ -2265,6 +2269,51 @@ function pageAcct(){
         <button class="btn-sm" onclick="acctClearSel()">清空勾选</button>
       </div>
       <div id="acctList">${acctListHTML(acc)}</div>
+    </div>
+  </div>`;
+}
+function pageGift(){
+  const g=giftStat('month');
+  const gifts=S.gifts.filter(x=>giftTab==='all'||x.type===giftTab).sort((a,x)=>x.ts-a.ts);
+  return `
+  <div class="page-anim">
+    <div class="row" style="margin:4px 2px 14px;align-items:center">
+      <button class="btn btn-sm" style="padding:8px 12px" onclick="goback()">‹ 返回</button>
+      <div class="h1 grow" style="text-align:center">🎁 份子钱台账</div>
+      <button class="btn btn-grass btn-sm" style="padding:8px 12px" onclick="openGiftModal()">＋ 新增</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">本月人情 <span class="sub" style="font-weight:400">收 / 送 / 净差</span></div>
+      <div class="row" style="justify-content:space-around;text-align:center;margin:8px 0 4px">
+        <div><div style="font-size:12px;color:var(--sub)">收到</div><div style="font-weight:700;color:#3aa79f;font-size:19px">+¥${fmt(g.gin)}</div></div>
+        <div><div style="font-size:12px;color:var(--sub)">送出</div><div style="font-weight:700;color:#f1bfbc;font-size:19px">-¥${fmt(g.gout)}</div></div>
+        <div><div style="font-size:12px;color:var(--sub)">净差</div><div style="font-weight:700;color:${g.net>=0?'#3aa79f':'#e0908b'};font-size:19px">${g.net>=0?'+':''}${fmt(g.net)}</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="card-title" style="margin:0">往来明细</div>
+        <button class="btn-sm" onclick="exportGiftSet()">⬇️ 导出</button>
+      </div>
+      <div class="seg" style="margin-bottom:8px">
+        <button class="${giftTab==='in'?'on':''}" style="${giftTab==='in'?'color:#1f5b57':''}" onclick="giftTab='in';render()">收到份子钱</button>
+        <button class="${giftTab==='out'?'on':''}" style="${giftTab==='out'?'color:#c98d88':''}" onclick="giftTab='out';render()">送出份子钱</button>
+        <button class="${giftTab==='all'?'on':''}" onclick="giftTab='all';render()">全部往来</button>
+      </div>
+      <input placeholder="🔍 按姓名 / 事件筛选人情往来" value="${esc(giftQuery)}" style="margin:8px 0" oninput="filterGift(this.value)">
+      <div id="giftList">
+      ${gifts.length?gifts.map(giftRow).join(''):`<div class="empty">暂无${giftTab==='all'?'往来':(giftTab==='in'?'收到':'送出')}记录</div>`}
+      </div>
+      <div id="giftSummary">${giftSummaryHTML()}</div>
+      <button class="btn btn-grass btn-block mt8" onclick="openGiftModal()">＋ 新增份子记录</button>
+    </div>
+
+    <div class="card" style="padding:0">
+      <button class="btn btn-block" style="padding:16px;justify-content:space-between" onclick="go('money',false)">
+        <span style="font-weight:700">回到「账目」页</span><span style="color:var(--sub)">›</span>
+      </button>
     </div>
   </div>`;
 }
@@ -3324,7 +3373,7 @@ function pushChat(q){
 }
 
 /* ================= 渲染入口 ================= */
-const PAGES={home:pageHome,hub:pageHub,study:pageStudy,money:pageMoney,shift:pageShift,me:pageMe,acct:pageAcct};
+const PAGES={home:pageHome,hub:pageHub,study:pageStudy,money:pageMoney,shift:pageShift,me:pageMe,acct:pageAcct,gift:pageGift};
 function render(){
   let html=navHistory.length>0?`<div class="back-bar" onclick="goback()"><span class="bk">‹</span>返回</div>`:'';
   html+=PAGES[cur]();
