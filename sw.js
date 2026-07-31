@@ -1,5 +1,5 @@
 /* 火焰兰 PersonalOS — Service Worker（页面网络优先 + 资源缓存兜底） */
-const CACHE='huoyanlan-os-v8';
+const CACHE='huoyanlan-os-v9';
 const ASSETS=[
   './','./index.html','./manifest.webmanifest',
   './icon.svg','./icon-192.png','./icon-512.png','./apple-touch-icon.png'
