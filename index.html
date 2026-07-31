@@ -463,10 +463,10 @@ async function lockSetup(pw){
     if(_hasCrypto){
       _sessKey=await deriveAes(pw,salt);_lockSalt=salt;
       const check=await aesGcmEncrypt(_sessKey,'huoyanlan-ok');
-      rec={v:2,kind:'aes',salt:Array.from(salt),check:check};
+      rec={v:2,kind:'aes',salt:Array.from(salt),check:check,secqa:getSecQA()};
     }else{
       _sessXor=hashStr(pw+'huoyanlan');
-      rec={v:2,kind:'xor',salt:'huoyanlan',check:hashStr(pw+'huoyanlan')};
+      rec={v:2,kind:'xor',salt:'huoyanlan',check:hashStr(pw+'huoyanlan'),secqa:getSecQA()};
     }
     localStorage.setItem(LOCK_KEY,JSON.stringify(rec));
     const data=S?S:(_migratePlain||JSON.parse(JSON.stringify(DEF)));
@@ -611,8 +611,12 @@ let _lockCloudErr=false;   // 云已连接但拉取锁失败（令牌/网络异�
 let _lockCloudSha=null;    // 云端 lock.json 的 sha（用于更新/删除）
 let _lockSkip=false;       // 本机无数据（新设备/未恢复）：跳过设备锁，直接进入
 let _secVerified=false;    // 安全问题是否已验证通过
-const SEC_Q_A1='金蓓';      // 安全问题一答案：姓名
-const SEC_Q_A2='13702';    // 安全问题二答案：住址门牌号（5 位）
+const LOCK_SEC_QA_KEY='huoyanlan_lock_secqa_v1';
+function getSecQA(){
+  try{ const r=JSON.parse(localStorage.getItem(LOCK_SEC_QA_KEY)||'null'); if(r&&r.a1!==undefined&&r.a1!==null) return r; }catch(e){}
+  return {q1:'你的姓名是？',a1:'金蓓',q2:'住址门牌号（5位）？',a2:'13702'};
+}
+function setSecQA(q1,a1,q2,a2){ localStorage.setItem(LOCK_SEC_QA_KEY, JSON.stringify({q1,a1,q2,a2})); }
 async function ghLockGet(){
   const p=ghRepoParts();p.path=LOCK_CLOUD_PATH;
   const url=`${GH_API}/repos/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.name)}/contents/${encodeURIComponent(p.path)}?ref=${encodeURIComponent(p.branch)}`;
@@ -654,7 +658,7 @@ async function lockInit(){
   if(ghCredReady()){
     try{
       const g=await ghLockGet();
-      if(g.ok&&g.raw){localStorage.setItem(LOCK_KEY,g.raw);_lockGlobal=true;_lockCloudSha=g.sha;}
+      if(g.ok&&g.raw){localStorage.setItem(LOCK_KEY,g.raw);try{const r=JSON.parse(g.raw);if(r&&r.secqa)localStorage.setItem(LOCK_SEC_QA_KEY,JSON.stringify(r.secqa));}catch(e){};_lockGlobal=true;_lockCloudSha=g.sha;}
       else if(g.ok&&!g.raw){await lockPushCloud();_lockGlobal=true;}
       else{_lockGlobal=false;}
     }catch(e){_lockGlobal=false;}
@@ -667,6 +671,11 @@ function lockSetupPrompt(){
     <input id="sp1" type="password" placeholder="密码">
     <div class="f-label mt8">再次输入</div>
     <input id="sp2" type="password" placeholder="确认">
+    <div class="f-label mt8">安全问题（用于找回密码）</div>
+    <input id="sq_q1" placeholder="问题一，如：你的宠物名字？">
+    <input id="sq_a1" placeholder="答案一">
+    <input id="sq_q2" placeholder="问题二，如：你小学名字？">
+    <input id="sq_a2" placeholder="答案二">
     <div class="lock-err" id="spErr"></div>
     <div class="grid2 mt16"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-coral" onclick="doLockSetupPrompt()">开启密码锁</button></div>`);
 }
@@ -674,6 +683,8 @@ async function doLockSetupPrompt(){
   const p1=document.getElementById('sp1').value,p2=document.getElementById('sp2').value,err=document.getElementById('spErr');
   if(p1.length<4){err.textContent='密码至少 4 位';return;}
   if(p1!==p2){err.textContent='两次不一致';return;}
+  const q1=document.getElementById('sq_q1').value,a1=document.getElementById('sq_a1').value,q2=document.getElementById('sq_q2').value,a2=document.getElementById('sq_a2').value;
+  setSecQA(q1,a1,q2,a2);
   await lockSetup(p1);closeModal();render();
 }
 function changeLockPw(){
@@ -682,14 +693,15 @@ function changeLockPw(){
     <div class="f-label">当前密码</div>
     <input id="lpOld" type="password" placeholder="当前密码">
     <span class="lock-link" style="margin:8px 0 0;display:inline-block;cursor:pointer" onclick="showSecQ()">忘记原密码？通过安全问题验证 ›</span>
-    <div id="secQWrap" style="display:none;margin-top:10px;padding:10px;background:var(--bg,#f4deda);border-radius:12px">
-      <div class="f-label">问题一：你的姓名是？</div>
-      <input id="sq1" placeholder="姓名">
-      <div class="f-label mt8">问题二：住址门牌号（5 位）？</div>
-      <input id="sq2" placeholder="5 位数字" inputmode="numeric" maxlength="5">
+      <div id="secQWrap" style="display:none;margin-top:10px;padding:10px;background:var(--bg,#f4deda);border-radius:12px">
+      <div class="f-label">设置你自己的安全问题（随云备份保存到各设备）</div>
+      <input id="sq_q1" placeholder="问题一，如：你的宠物名字？">
+      <input id="sq_a1" placeholder="答案一">
+      <input id="sq_q2" placeholder="问题二，如：你母校名字？">
+      <input id="sq_a2" placeholder="答案二">
       <button class="btn btn-ghost mt8" onclick="verifySecQ()">验证安全问题</button>
       <div class="lock-err" id="sqErr"></div>
-    </div>
+      </div>
     <div class="f-label mt8">新密码（至少 4 位）</div>
     <input id="lpNew" type="password" placeholder="新密码">
     <div class="f-label mt8">再次输入新密码</div>
@@ -699,10 +711,12 @@ function changeLockPw(){
 }
 function showSecQ(){const w=document.getElementById('secQWrap');if(w)w.style.display='block';}
 function verifySecQ(){
-  const a1=(document.getElementById('sq1').value||'').trim();
-  const a2=(document.getElementById('sq2').value||'').trim();
+  const a1=(document.getElementById('sq_a1').value||'').trim();
+  const a2=(document.getElementById('sq_a2').value||'').trim();
   const err=document.getElementById('sqErr');
-  if(a1!==SEC_Q_A1||a2!==SEC_Q_A2){err.style.color='#e0908b';err.textContent='安全问题答案错误';return;}
+  const qa=getSecQA();
+  if(!qa){err.style.color='#e0908b';err.textContent='请先设置安全问题';return;}
+  if(a1!==qa.a1||a2!==qa.a2){err.style.color='#e0908b';err.textContent='安全问题答案错误';return;}
   _secVerified=true;err.style.color='#3aa79f';err.textContent='✅ 验证通过，请设置新密码';
 }
 async function doChangeLockPw(){
@@ -712,6 +726,8 @@ async function doChangeLockPw(){
   if(!oldOk){err.textContent='当前密码错误';return;}
   if(n1.length<4){err.textContent='新密码至少 4 位';return;}
   if(n1!==n2){err.textContent='两次不一致';return;}
+  const q1=document.getElementById('sq_q1').value,a1=document.getElementById('sq_a1').value,q2=document.getElementById('sq_q2').value,a2=document.getElementById('sq_a2').value;
+  setSecQA(q1,a1,q2,a2);
   await setLockPassword(n1);
   _secVerified=false;closeModal();
 }
@@ -1500,6 +1516,39 @@ function overviewItem(t){
       <button class="btn-sm" style="color:#e0908b" onclick="delTask('${t.id}')">删除</button>
     </div>
   </div>`;
+}
+/* ================= 连接手机日历（学习 / 排班 两款日历） ================= */
+function calNormTime(s){ if(s===undefined||s===null||s==='') return ''; s=String(s).replace(/[^\d:]/g,''); if(!s) return ''; const p=s.split(':'); if(p.length===2&&p[0].length<=2&&p[1].length<=2) return p[0].padStart(2,'0')+p[1].padStart(2,'0')+'00'; return s; }
+function buildICS(tab){
+  const ev=[];
+  if(tab==='study'){
+    (S?S.tasks||[]).forEach(t=>{ const d=t.sdate||t.date||''; if(d) ev.push({title:t.title||t.type||'学习任务', date:d, allDay:true}); });
+  } else {
+    (S?S.shifts||[]).forEach(sh=>{ const d=sh.date; if(d) ev.push({title:sh.key||'班次', date:d, dtstart:(sh.start!==undefined&&sh.start!=='')?sh.date.replace(/-/g,'').replace(/\.\d+/,'')+'T'+calNormTime(sh.start):undefined, dtend:(sh.end!==undefined&&sh.end!=='')?sh.date.replace(/-/g,'').replace(/\.\d+/,'')+'T'+calNormTime(sh.end):undefined}); });
+  }
+  let s='BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//huoyanlan//PersonalOS//CN\nCALSCALE:GREGORIAN\n';
+  ev.forEach((e,i)=>{
+    s+='BEGIN:VEVENT\nUID:'+Date.now()+'_'+i+'_'+Math.random().toString(36).slice(2)+'@huoyanlan\nDTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,'')+'\n';
+    if(e.allDay){ s+='DTSTART;VALUE=DATE:'+e.date.replace(/-/g,'')+'\n'; }
+    else { s+='DTSTART:'+e.dtstart+'\n'; if(e.dtend!==undefined) s+='DTEND:'+e.dtend+'\n'; }
+    s+='SUMMARY:'+(e.title||'事件')+'\nEND:VEVENT\n';
+  });
+  s+='END:VCALENDAR';
+  return s;
+}
+function downloadICS(name, content){
+  const blob=new Blob([content],{type:'text/calendar'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=name+'.ics'; document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url); a.remove();}, 1500);
+  toast('已生成 .ics，手机点开即加入系统日历');
+}
+function syncCal(tab){ downloadICS(tab==='study'?'学习日历':'排班日历', buildICS(tab)); }
+function openNativeCal(){
+  const ua=navigator.userAgent;
+  if(/iPhone|iPad|iPod/.test(ua)) location.href='calshow://';
+  else if(/Android/.test(ua)) location.href='intent://#Intent;action=android.intent.action.VIEW;type=vnd.android.cursor.item/event;S.b讲owser_fallback_url=https%3A%2F%2Fwww.google.com%2Fcalendar;end';
+  else toast('当前平台无直接唤起，请用「生成 .ics」导入');
 }
 function pageStudy(){
   return studyView==='all'?studyOverview():studyToday();
