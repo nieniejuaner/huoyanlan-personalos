@@ -1,12 +1,13 @@
 /* 火焰兰 PersonalOS — Service Worker（页面网络优先 + 资源缓存兜底） */
-const CACHE='huoyanlan-os-v22';
+const CACHE='huoyanlan-os-v23';
 const ASSETS=[
   './','./index.html','./manifest.webmanifest',
   './icon.svg','./icon-192.png','./icon-512.png','./apple-touch-icon.png'
 ];
 self.addEventListener('install',e=>{
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS).then(()=>self.skipWaiting())).catch(()=>self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).catch(()=>{}));
 });
+self.addEventListener('message',e=>{ if(e.data==='skip') self.skipWaiting(); });
 self.addEventListener('activate',e=>{
   e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
 });
