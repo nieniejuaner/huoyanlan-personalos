@@ -400,7 +400,7 @@ const shiftColor=t=>{const f=SHIFT_TYPES.find(x=>x.key===t);return f?f.color:'#e
 let S=null;
 function mergeDef(d){const s=Object.assign(JSON.parse(JSON.stringify(DEF)),d||{});(s.shifts||[]).forEach(sh=>{if(sh.sdate===undefined){sh.sdate=sh.date||'';sh.stime=sh.start||'';sh.edate=sh.date||sh.sdate;sh.etime=sh.end||'';}});return s;}
 function load(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);return mergeDef(d);}}catch(e){}return mergeDef({});}
-async function save(){if(!_sessKey&&!_sessXor)return;S._ts=S._ts||Date.now();try{await lockStore(S);}catch(e){console.warn('save',e);}scheduleSync();}
+async function save(){if(!S)return;S._ts=S._ts||Date.now();if(!_sessKey&&!_sessXor){localStorage.setItem(KEY,JSON.stringify(S));scheduleSync();return;}try{await lockStore(S);}catch(e){console.warn('save',e);}scheduleSync();}
 function commit(){save();render();}
 
 /* ================= 应用锁（访问密码 · 本地加密） ================= */
@@ -441,8 +441,8 @@ function xorStrBack(b64,key){
 }
 async function lockEncrypt(obj){
   const json=JSON.stringify(obj);
-  if(_hasCrypto&&_sessKey){const b=await aesGcmEncrypt(_sessKey,json);return {v:2,kind:'aes',iv:b.iv,ct:b.ct};}
-  if(_sessXor){return {v:2,kind:'xor',ct:xorStr(json,_sessXor)};}
+  if(_hasCrypto&&_sessKey){const b=await aesGcmEncrypt(_sessKey,json);return {v:3,kind:'aes',salt:(_lockSalt?Array.from(_lockSalt):null),iv:b.iv,ct:b.ct};}
+  if(_sessXor){return {v:3,kind:'xor',ct:xorStr(json,_sessXor)};}
   throw new Error('未解锁');
 }
 async function lockDecrypt(rec){
@@ -469,7 +469,7 @@ async function lockSetup(pw){
       rec={v:2,kind:'xor',salt:'huoyanlan',check:hashStr(pw+'huoyanlan')};
     }
     localStorage.setItem(LOCK_KEY,JSON.stringify(rec));
-    const data=_migratePlain||JSON.parse(JSON.stringify(DEF));
+    const data=S?S:(_migratePlain||JSON.parse(JSON.stringify(DEF)));
     await lockStore(data);_migratePlain=null;
     toast('密码已设置 🔒');
     if(ghCredReady())lockPushCloud();
@@ -569,6 +569,7 @@ function lockScreenHTML(){
 function lockRetry(){lockInit().then(setupLockScreen).catch(()=>setupLockScreen());}
 function setupLockScreen(){
   const ls=document.getElementById('lockScreen');if(!ls)return;
+  if(_lockSkip){ _booted=true; if(!S)S=load(); ls.style.display='none'; fullBoot(); return; }
   ls.innerHTML=lockScreenHTML();
   ls.style.display='flex';
   const inp=ls.querySelector('input');if(inp)inp.focus();
@@ -608,6 +609,7 @@ const LOCK_CLOUD_PATH='lock.json';
 let _lockGlobal=false;     // 当前锁是否来自云端（全局锁）
 let _lockCloudErr=false;   // 云已连接但拉取锁失败（令牌/网络异常）
 let _lockCloudSha=null;    // 云端 lock.json 的 sha（用于更新/删除）
+let _lockSkip=false;       // 本机无数据（新设备/未恢复）：跳过设备锁，直接进入
 let _secVerified=false;    // 安全问题是否已验证通过
 const SEC_Q_A1='金蓓';      // 安全问题一答案：姓名
 const SEC_Q_A2='13702';    // 安全问题二答案：住址门牌号（5 位）
@@ -644,15 +646,18 @@ async function lockPushCloud(){
   try{const g=await ghLockGet();if(g.ok){await ghLockPut(rec,g.sha||null);_lockCloudSha=g.sha;}}catch(e){}
 }
 async function lockInit(){
-  // 决定权威锁记录：云端优先（保证多端同一把密码）；本机已配云凭证即尝试读取/写入云端锁
+  // 本机未设过密码锁（新设备/未恢复/从未开启锁）：不要求设备锁，直接进入；用户可在应用内开启或连接云端恢复
   _lockCloudErr=false;
+  if(!localStorage.getItem(LOCK_KEY)){ _lockSkip=true; _lockGlobal=false; return; }
+  _lockSkip=false;
+  // 已设锁：云端优先（保证多端同一把密码），否则用本机锁
   if(ghCredReady()){
     try{
       const g=await ghLockGet();
       if(g.ok&&g.raw){localStorage.setItem(LOCK_KEY,g.raw);_lockGlobal=true;_lockCloudSha=g.sha;}
-      else if(g.ok&&!g.raw){if(localStorage.getItem(LOCK_KEY)){await lockPushCloud();_lockGlobal=!!localStorage.getItem(LOCK_KEY);}else{_lockGlobal=false;}}
-      else{_lockGlobal=false;_lockCloudErr=false;} // 云端不可达（含凭证失效）时降级本机锁，避免卡死
-    }catch(e){_lockGlobal=false;_lockCloudErr=false;}
+      else if(g.ok&&!g.raw){await lockPushCloud();_lockGlobal=true;}
+      else{_lockGlobal=false;}
+    }catch(e){_lockGlobal=false;}
   }else{_lockGlobal=false;}
 }
 function lockSetupPrompt(){
@@ -817,7 +822,7 @@ async function cloudPush(){
   if(!_sessKey&&!_sessXor)return; // 未解锁不推送
   S._ts=Date.now();
   const payload=S;
-  const enc=await lockEncrypt(payload);
+  const enc=(_sessKey||_sessXor)?await lockEncrypt(payload):payload;
   const raw=JSON.stringify(enc);
   if(raw.length>900000){cloudSetStatus('error','数据过大（含图片可能超 1MB），请先「清除缓存图片」');return;}
   cloudSetStatus('syncing');
@@ -825,8 +830,8 @@ async function cloudPush(){
     const g=await ghGet();
     if(!g.ok){cloudSetStatus('error',g.err);return;}
     let remoteTs=0;
-    if(g.raw){try{const rec=JSON.parse(g.raw);const obj=await lockDecrypt(rec);remoteTs=obj._ts||0;}catch(e){try{const obj=JSON.parse(g.raw);remoteTs=obj._ts||0;}catch(e2){}}}
-    if(remoteTs>(payload._ts||0)){cloudSetStatus('ok','云端已有更新，已保留');const rec=JSON.parse(g.raw);await cloudApply(await lockDecrypt(rec));return;}
+    if(g.raw){try{const rec=JSON.parse(g.raw);const obj=await lockDecrypt(rec).catch(()=>JSON.parse(g.raw));remoteTs=obj._ts||0;}catch(e){try{const obj=JSON.parse(g.raw);remoteTs=obj._ts||0;}catch(e2){}}}
+    if(remoteTs>(payload._ts||0)){cloudSetStatus('ok','云端已有更新，已保留');try{const rec=JSON.parse(g.raw);const obj=await lockDecrypt(rec).catch(()=>JSON.parse(g.raw));await cloudApply(obj);}catch(e){}return;}
     const res=await ghPut(ghB64encode(raw),g.sha);
     if(res.ok){cloudState.last=Date.now();cloudSetStatus('ok','已同步 · '+fmtClock(cloudState.last));}
     else if(res.status===401){cloudSetStatus('error','令牌无效（401）');}
@@ -849,7 +854,14 @@ async function cloudPull(){
     if(!g.ok){cloudSetStatus('error',g.err);return false;}
     if(!g.raw){cloudSetStatus('ok','云端暂无数据');return false;}
     let obj;
-    try{obj=await lockDecrypt(JSON.parse(g.raw));}catch(e){try{obj=JSON.parse(g.raw);}catch(e2){cloudSetStatus('error','云端数据解析失败');return false;}}
+    try{ obj=await lockDecrypt(JSON.parse(g.raw)); }
+    catch(e){
+      // 云端数据已加密（来自其他已上锁设备）：要求输入密码解密后恢复，并在本机建立锁
+      const pw=await promptCloudPassword();
+      if(!pw){cloudSetStatus('ok','已取消恢复');return false;}
+      try{ obj=await decryptCloudWithPw(JSON.parse(g.raw),pw); }
+      catch(e2){ cloudSetStatus('error','密码错误，无法解密云端数据'); return false; }
+    }
     const ct=obj._ts||0;
     if(!S._ts||ct>S._ts){
       await cloudApply(obj);
@@ -859,6 +871,39 @@ async function cloudPull(){
     cloudSetStatus('ok','本地已是最新');
     return true;
   }catch(e){cloudSetStatus('error','网络异常');return false;}
+}
+async function decryptCloudWithPw(rec,pw){
+  if(rec.kind==='aes'){
+    const salt=rec.salt?new Uint8Array(rec.salt):(_lockSalt?new Uint8Array(_lockSalt):null);
+    if(!salt)throw new Error('缺少 salt');
+    const k=await deriveAes(pw,salt);
+    const json=await aesGcmDecrypt(k,rec.iv,rec.ct);
+    _sessKey=k;_lockSalt=salt;_sessXor=null;
+    const check=await aesGcmEncrypt(_sessKey,'huoyanlan-ok');
+    localStorage.setItem(LOCK_KEY,JSON.stringify({v:2,kind:'aes',salt:Array.from(salt),check:check}));
+    if(ghCredReady())lockPushCloud();
+    return JSON.parse(json);
+  } else if(rec.kind==='xor'){
+    const xk=hashStr(pw+'huoyanlan');
+    const json=xorStrBack(rec.ct,xk);
+    _sessXor=xk;_sessKey=null;
+    localStorage.setItem(LOCK_KEY,JSON.stringify({v:2,kind:'xor',salt:'huoyanlan',check:xk}));
+    if(ghCredReady())lockPushCloud();
+    return JSON.parse(json);
+  }
+  return rec;
+}
+function promptCloudPassword(){
+  return new Promise(resolve=>{
+    window.__pwresolve=resolve;
+    openModal(`<h3>🔓 解密并恢复云端数据 <button class="x" onclick="closeModal();__pwCancel()">✕</button></h3>
+      <p class="sub" style="font-size:13px">云端数据已加密，请输入你的访问密码以解密并恢复到本机。</p>
+      <input id="cpw" type="password" placeholder="访问密码" onkeydown="if(event.key==='Enter')__submitCpw()">
+      <div class="lock-err" id="cpwErr"></div>
+      <div class="grid2 mt16"><button class="btn btn-ghost" onclick="__pwCancel()">取消</button><button class="btn btn-coral" onclick="__submitCpw()">解密并恢复</button></div>`);
+    window.__pwCancel=function(){resolve(null);closeModal();};
+    window.__submitCpw=function(){const pw=document.getElementById('cpw').value;if(!pw){const e=document.getElementById('cpwErr');if(e)e.textContent='请输入密码';return;}resolve(pw);closeModal();};
+  });
 }
 function fmtClock(t){const d=new Date(t);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
 function cloudSetStatus(st,msg){cloudState.status=st;if(msg!==undefined)cloudState.msg=msg;refreshCloudCard();}
