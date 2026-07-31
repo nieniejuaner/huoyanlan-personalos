@@ -317,6 +317,16 @@ html.land{
 .bill-imp .sub{flex:none}
 .ov-search{flex:1;min-width:0;padding:9px 12px;border:2.5px solid var(--outline);border-radius:var(--r-btn);background:var(--card);font-size:14px;outline:none;box-sizing:border-box}
 .ov-search:focus{border-color:var(--coral)}
+/* 任务计时 / 闹钟 */
+.tmr-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
+.tmr-row .chip{font-size:12px;padding:3px 8px}
+.tmr-row .btn-sm{padding:4px 9px;font-size:12px}
+.kv{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed var(--outline)}
+.kv>span{width:54px;color:var(--sub);font-size:13px;flex:none}
+.kv>input,.kv>select{flex:1;min-width:0;padding:7px 9px;border:2px solid var(--outline);border-radius:8px;font-size:14px;background:var(--card)}
+.kv>b{font-size:14px}
+.cmd-box textarea{width:100%;min-height:78px;padding:10px;border:2.5px solid var(--outline);border-radius:10px;font-size:15px;resize:vertical;box-sizing:border-box;background:var(--card)}
+.cmd-box textarea:focus{border-color:var(--coral)}
 </style>
 </head>
 <body>
@@ -699,6 +709,7 @@ function renderTabbar(){
 
 /* ================= 悬浮按钮 ================= */
 const FAB_ACTS=[
+  {ic:'🎙',name:'语音指令',fn:'openCmdModal()'},
   {ic:'📝',name:'随笔速记',fn:'openNoteModal()'},
   {ic:'✅',name:'新增任务',fn:'openTaskModal()'},
   {ic:'💰',name:'收入分配',fn:'openIncomeModal()'},
@@ -1100,6 +1111,7 @@ function overviewItem(t){
         ${t.type==='repeat'?`<span class="chip">${repeatLabel(t)}</span>`:`<span class="chip coral">当日临时</span>`}
         ${status}
       </div>
+      ${((t.timer&&(t.timer.running||(t.timer.acc||0)>0))||(t.alarm&&t.alarm.on))?`<div class="tmr-row">${taskTimerHTML(t)}${taskAlarmHTML(t)}</div>`:''}
     </div>
     <div class="ov-acts">
       <button class="btn-sm" onclick="openTaskModal('${t.id}')">编辑</button>
@@ -1263,6 +1275,229 @@ function studyOverview(){
     ${ovCalCard()}
   </div>`;
 }
+
+/* ================= 语音/文字指令 + 任务闹钟计时 ================= */
+const WMAP={'日':0,'天':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6};
+function cmdAdd(d){const x=new Date();x.setDate(x.getDate()+d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');}
+function cmdDate(text){
+  if(/大后天/.test(text))return cmdAdd(3);
+  if(/后天/.test(text))return cmdAdd(2);
+  if(/(明早|明晨)/.test(text))return cmdAdd(1);
+  if(/(明天|明日)/.test(text))return cmdAdd(1);
+  if(/(今天|今日|现在)/.test(text))return cmdAdd(0);
+  const wm=text.match(/[周星礼]拜?([日天一二三四五六])/);
+  if(wm){const tg=WMAP[wm[1]];let diff=(tg-new Date().getDay()+7)%7;if(diff===0)diff=7;return cmdAdd(diff);}
+  const md=text.match(/(\d{1,2})月(\d{1,2})[日号]/);
+  if(md){const m=+md[1],d=+md[2];const y=new Date().getFullYear()+(m<new Date().getMonth()+1?1:0);return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+  const sl=text.match(/(\d{1,2})\/(\d{1,2})/);
+  if(sl){const m=+sl[1],d=+sl[2];const y=new Date().getFullYear()+(m<new Date().getMonth()+1?1:0);return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');}
+  return '';
+}
+function cmdTime(text){
+  let pm=/下午|晚上|傍晚|夜里/.test(text),am=/上午|早上|早晨|清晨|早/.test(text),base=/中午/.test(text)?12:0;
+  let h,m=0,has=false;
+  let mt=text.match(/(\d{1,2})[:：](\d{1,2})/);
+  if(mt){h=+mt[1];m=+mt[2];has=true;}
+  else{let hm=text.match(/(\d{1,2})\s*点\s*(半|(\d{1,2})分)?/);if(hm){h=+hm[1];if(hm[2]==='半')m=30;else if(hm[2])m=+hm[2];has=true;}}
+  if(!has)return null;
+  if(pm&&h<12)h+=12;if(am&&h===12)h=0;if(base===12&&h===undefined)h=12;
+  if(h===undefined)return null;
+  h=(h%24+24)%24;
+  return {h,m,str:String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')};
+}
+function cmdAmount(text){const m=text.match(/(?:¥|￥)?\s*(\d+(?:\.\d+)?)\s*(?:元|块|块钱)?/);return m?parseFloat(m[1]):0;}
+const CAT_MAP=[['工资','工资'],['薪','工资'],['奖金','奖金'],['报销','报销'],['分红','分红'],['返现','其他'],['利息','利息'],
+ ['吃','餐饮'],['饭','餐饮'],['餐','餐饮'],['外卖','餐饮'],['咖啡','餐饮'],['奶茶','餐饮'],['零食','餐饮'],
+ ['打车','交通'],['滴滴','交通'],['地铁','交通'],['公交','交通'],['加油','交通'],['高铁','交通'],['火车','交通'],['机票','交通'],['车','交通'],['油','交通'],
+ ['购物','购物'],['衣服','购物'],['鞋','购物'],['淘宝','购物'],['京东','购物'],['买','购物'],
+ ['房租','居住'],['租','居住'],['物业','居住'],['水电','居住'],['话费','居住'],['宽带','居住'],
+ ['医','医疗'],['药','医疗'],['医院','医疗'],['体检','医疗'],
+ ['电影','娱乐'],['游戏','娱乐'],['旅游','娱乐'],['会员','娱乐'],['玩','娱乐'],
+ ['书','学习'],['课','学习'],['学','学习'],['培训','学习'],
+ ['红包','人情'],['份子','人情'],['礼','人情']];
+function cmdCat(text,def){for(const k of CAT_MAP)if(text.includes(k[0]))return k[1];return def||'其他';}
+function cmdRepeat(text){
+  if(/每天|每日|天天|永久|一直|长期/.test(text))return 'forever';
+  if(/每周|每星期|礼拜/.test(text))return 'weekly';
+  const dm=text.match(/连续\s*(\d+)\s*天/);if(dm)return {type:'days',n:+dm[1]};
+  return null;
+}
+function cmdAlarm(text){
+  const a={type:'none',mins:0,at:''};
+  let cd=text.match(/倒计时\s*(\d+(?:\.\d+)?)\s*(分钟|分|min|小时|h)/);
+  if(cd){let v=parseFloat(cd[1]);if(/小时|h/.test(cd[2]))v*=60;a.type='countdown';a.mins=Math.round(v);return a;}
+  let cd2=text.match(/(\d+(?:\.\d+)?)\s*(分钟|分)\s*(?:后|之后|钟后)?\s*(?:提醒|闹钟|叫|提醒我)/);
+  if(cd2){a.type='countdown';a.mins=Math.round(parseFloat(cd2[1]));return a;}
+  if(/计时|秒表|计时器/.test(text)){a.type='timer';return a;}
+  if(/定时|提醒|闹钟|叫醒|叫我|提醒我/.test(text)){
+    const tm=cmdTime(text),dt=cmdDate(text);
+    if(tm){a.type='scheduled';a.at=(dt||today())+'T'+tm.str;}
+    else a.type='none';
+    return a;
+  }
+  return a;
+}
+function cmdTitle(text){
+  let s=text;
+  s=s.replace(/今天|今日|现在|明天|明日|明早|明晨|后天|大后天|下?[周星礼]拜?[日天一二三四五六]/g,'')
+    .replace(/\d{1,2}月\d{1,2}[日号]/g,'').replace(/\d{1,2}\/\d{1,2}/g,'')
+    .replace(/上午|早上|早晨|清晨|中午|下午|晚上|傍晚|夜里/g,'')
+    .replace(/\d{1,2}[:：]\d{1,2}/g,'').replace(/\d{1,2}\s*点\s*(?:半|\d{1,2}分)?/g,'').replace(/\d{1,2}\s*点/g,'')
+    .replace(/倒计时\s*\d+(?:\.\d+)?\s*(?:分钟|分|小时|h|min)/g,'').replace(/\d+(?:\.\d+)?\s*(?:分钟|分|小时|h)\s*(?:后|之后|钟后)?\s*(?:提醒|闹钟|叫|提醒我)/g,'')
+    .replace(/每天|每日|天天|永久|一直|长期|每周|每星期|连续\s*\d+\s*天|定时|提醒我|提醒|闹钟|叫醒|叫我|叫|计时|秒表|计时器/g,'')
+    .replace(/帮我|请|创建|新建|设个|一个|一下|我要|我想|添加|增加|记一笔|记账|支出|收入|花了|花掉|开销|消费|付了|付给|买了|赚|工资|进账|收款|报销|奖金|红包|份子|¥|￥|\d+(?:\.\d+)?\s*元|\d+(?:\.\d+)?\s*块/g,'')
+    .replace(/[，,。.！!？?\s]+/g,'');
+  return s.trim().slice(0,40)||'新任务';
+}
+function parseCommand(text){
+  const p={intent:'task',title:'',date:'',time:'',repeat:null,amount:0,category:'',account:'',note:'',alarm:{type:'none',mins:0,at:''},timer:false,raw:text};
+  text=String(text||'');
+  const isIncome=/收入|赚|工资|发工资|进账|收款|报销|奖金|返现|利息|分红|红包|份子/.test(text);
+  const isExpense=(/支出|花了|花掉|开销|消费|付了|付给|买了|记一笔|记账|[¥￥]|\d+\s*(?:元|块)/.test(text))&&!isIncome;
+  if(isIncome)p.intent='income';else if(isExpense)p.intent='expense';else p.intent='task';
+  p.date=cmdDate(text);
+  const tm=cmdTime(text);if(tm)p.time=tm.str;
+  p.repeat=cmdRepeat(text);
+  p.alarm=cmdAlarm(text);
+  if(p.alarm.type==='timer')p.timer=true;
+  if(p.intent!=='task'){p.amount=cmdAmount(text);p.category=cmdCat(text,p.intent==='income'?'工资':'餐饮');let ttl=cmdTitle(text).replace(/\d+(\.\d+)?/g,'').trim();p.title=ttl||p.category;}
+  else p.title=cmdTitle(text);
+  return p;
+}
+function openCmdModal(){
+  ensureNotify();
+  const hasSR=!!(window.SpeechRecognition||window.webkitSpeechRecognition);
+  openModal(`<h3>🎙 语音 / 文字指令 <button class="x" onclick="closeModal()">✕</button></h3>
+   <p class="sub">说出来或打字，自动建任务 / 记账。例如：「明早9点提醒我交报告」「记一笔支出 38 午饭」「每天背50个单词」「倒计时25分钟 专注」</p>
+   <div class="cmd-box">
+     <textarea id="cmdText" rows="3" placeholder="在这里说话或输入指令…"></textarea>
+     <div class="row" style="gap:8px;margin-top:8px">
+       ${hasSR?`<button id="cmdMic" class="btn btn-coral" onclick="startRec()">🎙 说话</button>`:`<span class="sub">本设备不支持语音识别，请用键盘「🎙 听写」或打字</span>`}
+       <button class="btn btn-grass" onclick="runCmd()">识别并创建</button>
+     </div>
+   </div>
+   <div id="cmdPrev"></div>`);
+  window._cmd={};
+}
+let _rec=null;
+function startRec(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('本设备不支持语音识别');return;}
+  if(_rec&&_rec._on){_rec.stop();return;}
+  const r=new SR();_rec=r;r._on=true;r.lang='zh-CN';r.interimResults=true;r.continuous=false;
+  const ta=$('#cmdText'),mic=$('#cmdMic');
+  r.onresult=e=>{let s='';for(let i=0;i<e.results.length;i++)s+=e.results[i][0].transcript;if(ta)ta.value=s;};
+  r.onerror=()=>{toast('识别失败，可改用键盘听写');if(mic)mic.textContent='🎙 重试';r._on=false;};
+  r.onend=()=>{r._on=false;if(mic)mic.textContent='🎙 说话';};
+  try{r.start();if(mic)mic.textContent='🛑 停止';}catch(e){toast('无法启动麦克风');}
+}
+function runCmd(){
+  const ta=$('#cmdText');if(!ta)return;const text=ta.value.trim();
+  if(!text){toast('请先说话或输入');return;}
+  const p=parseCommand(text);window._cmd=p;
+  const iname={task:'✅ 任务',expense:'💸 支出',income:'💰 收入'}[p.intent];
+  let rows=`<div class="kv"><span>类型</span><b>${iname}</b></div>`;
+  if(p.intent==='task'){
+    rows+=`<div class="kv"><span>名称</span><input id="pvTitle" value="${esc(p.title)}"></div>`;
+    rows+=`<div class="kv"><span>日期</span><input id="pvDate" type="date" value="${p.date}"></div>`;
+    rows+=`<div class="kv"><span>循环</span><b>${p.repeat?(p.repeat.type==='days'?'连续'+p.repeat.n+'天':p.repeat):'无'}</b></div>`;
+  }else{
+    rows+=`<div class="kv"><span>金额</span><input id="pvAmt" type="number" step="0.01" value="${p.amount}"></div>`;
+    rows+=`<div class="kv"><span>分类</span><input id="pvCat" value="${esc(p.category)}"></div>`;
+    rows+=`<div class="kv"><span>日期</span><input id="pvDate" type="date" value="${p.date}"></div>`;
+  }
+  let al='无';
+  if(p.alarm.type==='countdown')al='倒计时 '+p.alarm.mins+' 分钟';
+  else if(p.alarm.type==='scheduled')al='定时 '+(p.alarm.at||'(未识别时间)');
+  else if(p.alarm.type==='timer')al='开启计时';
+  rows+=`<div class="kv"><span>提醒</span><b>${al}</b></div>`;
+  const prev=$('#cmdPrev');if(prev)prev.innerHTML=`<div class="card" style="margin-top:10px">${rows}<div class="row mt12" style="gap:8px"><button class="btn btn-coral btn-block" onclick="cmdCreate()">确认创建</button></div></div>`;
+}
+function cmdCreate(){
+  const p=window._cmd;if(!p){toast('请先识别');return;}
+  if(p.intent==='task'){
+    const title=($('#pvTitle').value.trim())||p.title;
+    const date=($('#pvDate').value)||p.date||today();
+    const rep=p.repeat;
+    const t={id:uid(),title,type:rep?'repeat':'temp',createdDate:date,repeatType:rep?rep.type:null,repeatN:(rep&&rep.type==='days')?rep.n:7,weekdays:(rep&&rep.type==='weekly')?[new Date(date).getDay()]:[],endedDate:null,alarm:{type:'none',on:false,deadline:0},timer:{acc:0,running:false,startedAt:0},note:''};
+    if(p.alarm.type==='countdown')t.alarm={type:'countdown',mins:p.alarm.mins,deadline:Date.now()+p.alarm.mins*60000,on:true};
+    else if(p.alarm.type==='scheduled'&&p.alarm.at)t.alarm={type:'scheduled',at:p.alarm.at,on:true};
+    if(p.alarm.type==='timer')t.timer={acc:0,running:true,startedAt:Date.now()};
+    S.tasks.push(t);commit();toast('✅ 任务已创建');
+  }else if(p.intent==='expense'){
+    const amt=parseFloat($('#pvAmt').value)||p.amount;
+    const cat=($('#pvCat').value.trim())||p.category||'其他';
+    const date=($('#pvDate').value)||p.date||today();
+    S.expenses.push({id:uid(),ts:Date.now(),date,amount:amt,account:'日常',category:cat,note:p.title||'',img:''});
+    commit();toast('💸 支出已记录');
+  }else if(p.intent==='income'){
+    const amt=parseFloat($('#pvAmt').value)||p.amount;
+    const cat=($('#pvCat').value.trim())||p.category||'其他';
+    const date=($('#pvDate').value)||p.date||today();
+    S.incomes.push({id:uid(),ts:Date.now(),date,total:amt,alloc:{save:0,daily:amt,mood:0},category:cat,note:p.title||'',img:''});
+    commit();toast('💰 收入已记录');
+  }
+  closeModal();
+}
+
+/* 闹钟 / 计时 运行时 */
+function fmtDur(s){s=Math.max(0,Math.floor(s||0));const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),x=s%60;return (h>0?h+':':'')+String(m).padStart(h>0?2:1,'0')+':'+String(x).padStart(2,'0');}
+let _ac=null;
+function beep(times){
+  try{
+    _ac=_ac||new (window.AudioContext||window.webkitAudioContext)();
+    if(_ac.state==='suspended')_ac.resume();
+    const now=_ac.currentTime;times=times||3;
+    for(let i=0;i<times;i++){
+      const o=_ac.createOscillator(),g=_ac.createGain();
+      o.type='sine';o.frequency.value=880;o.connect(g);g.connect(_ac.destination);
+      const st=now+i*0.35;
+      g.gain.setValueAtTime(0.001,st);
+      g.gain.exponentialRampToValueAtTime(0.3,st+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,st+0.3);
+      o.start(st);o.stop(st+0.32);
+    }
+  }catch(e){}
+}
+function ensureNotify(){if('Notification'in window&&Notification.permission==='default'){try{Notification.requestPermission();}catch(e){}}}
+function fireAlarm(t,label){beep(3);ensureNotify();if('Notification'in window&&Notification.permission==='granted'){try{new Notification('⏰ 火焰兰提醒',{body:label});}catch(e){}}toast('⏰ '+label);}
+function alarmTick(){
+  const now=Date.now();let needSave=false;
+  S.tasks.forEach(t=>{
+    const tm=t.timer||{};
+    if(tm.running){const el=document.getElementById('tmr-'+t.id);if(el)el.textContent=fmtDur((tm.acc||0)+(now-(tm.startedAt||now))/1000);}
+    const al=t.alarm||{};
+    if(al.on&&al.type==='countdown'&&al.deadline){
+      const left=(al.deadline-now)/1000;const el=document.getElementById('alm-'+t.id);if(el)el.textContent='⏰ '+fmtDur(Math.max(0,left));
+      if(left<=0){al.on=false;fireAlarm(t,(t.title||'任务')+' · 倒计时结束');needSave=true;}
+    }
+    if(al.on&&al.type==='scheduled'&&al.at){
+      if(now>=new Date(al.at).getTime()){al.on=false;fireAlarm(t,(t.title||'任务')+' · 定时到了');needSave=true;}
+    }
+  });
+  if(needSave)save();
+}
+function startTimer(id){const t=S.tasks.find(x=>x.id===id);if(!t)return;t.timer=t.timer||{acc:0,running:false,startedAt:0};if(t.timer.running)return;t.timer.running=true;t.timer.startedAt=Date.now();save();}
+function pauseTimer(id){const t=S.tasks.find(x=>x.id===id);if(!t||!t.timer||!t.timer.running)return;t.timer.acc=(t.timer.acc||0)+(Date.now()-(t.timer.startedAt||Date.now()))/1000;t.timer.running=false;save();}
+function resetTimer(id){const t=S.tasks.find(x=>x.id===id);if(!t)return;t.timer={acc:0,running:false,startedAt:0};save();}
+function setCountdown(id,mins){const t=S.tasks.find(x=>x.id===id);if(!t)return;t.alarm=t.alarm||{type:'none',mins:0,at:'',on:false,deadline:0};t.alarm.type='countdown';t.alarm.mins=Math.round(mins);t.alarm.deadline=Date.now()+Math.round(mins*60000);t.alarm.on=true;ensureNotify();save();toast('⏰ 倒计时已设置');}
+function setScheduled(id,at){const t=S.tasks.find(x=>x.id===id);if(!t)return;t.alarm=t.alarm||{type:'none',mins:0,at:'',on:false,deadline:0};t.alarm.type='scheduled';t.alarm.at=at;t.alarm.on=true;ensureNotify();save();toast('⏰ 定时已设置');}
+function cancelAlarm(id){const t=S.tasks.find(x=>x.id===id);if(!t)return;t.alarm=t.alarm||{type:'none',mins:0,at:'',on:false,deadline:0};t.alarm.on=false;t.alarm.type='none';save();}
+function taskTimerHTML(t){
+  const tm=t.timer||{};const run=!!tm.running;
+  const cur=run?fmtDur((tm.acc||0)+(Date.now()-(tm.startedAt||Date.now()))/1000):fmtDur(tm.acc||0);
+  return `<div class="tmr-row"><span class="chip aqua">⏱ <b id="tmr-${t.id}">${cur}</b></span>
+    <button class="btn-sm" onclick="${run?'pauseTimer':'startTimer'}('${t.id}')">${run?'⏸ 暂停':'▶ 计时'}</button>
+    <button class="btn-sm" onclick="resetTimer('${t.id}')">⟲ 清零</button></div>`;
+}
+function taskAlarmHTML(t){
+  const al=t.alarm||{};if(!al.on)return '';
+  const el='alm-'+t.id;
+  const txt=al.type==='countdown'?'⏰ '+(al.deadline?fmtDur(Math.max(0,(al.deadline-Date.now())/1000)):(al.mins||0)+'分'):'⏰ 定时 '+(al.at?al.at.replace('T',' '):'');
+  return `<div class="tmr-row"><span class="chip coral"><b id="${el}">${txt}</b></span><button class="btn-sm" onclick="cancelAlarm('${t.id}')">✕ 取消</button></div>`;
+}
+
+/* FAB 新增语音指令 */
 </script>
 <script>
 /* ================= Tab4 账目 ================= */
@@ -2251,6 +2486,23 @@ function delSchedule(id){S.schedule=S.schedule.filter(x=>x.id!==id);commit();}
 function openTaskModal(id,forDate){
   const t=id?S.tasks.find(x=>x.id===id):null;
   const fd=(!t&&forDate&&forDate!==today())?forDate:'';
+  const al=t&&t.alarm?t.alarm:{type:'none',mins:25,at:''};
+  window._almType=al.type||'none';
+  const almSec=`
+    <div class="f-label">⏱ 专注计时（每个任务独立）</div>
+    ${id?`<div class="row" style="gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="startTimer('${id}')">▶ 开始</button>
+      <button class="btn btn-ghost btn-sm" onclick="pauseTimer('${id}')">⏸ 暂停</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetTimer('${id}')">⟲ 清零</button>
+    </div>`:`<p class="sub">保存任务后即可开始计时</p>`}
+    <div class="f-label">⏰ 闹钟</div>
+    <div class="seg" id="almSeg">
+      <button class="${window._almType==='none'?'on':''}" onclick="pickAlarm('none')">无</button>
+      <button class="${window._almType==='countdown'?'on':''}" onclick="pickAlarm('countdown')">倒计时</button>
+      <button class="${window._almType==='scheduled'?'on':''}" onclick="pickAlarm('scheduled')">定时</button>
+    </div>
+    <div id="almCdBox" style="display:${window._almType==='countdown'?'block':'none'}"><div class="f-label">分钟数</div><input id="almMins" type="number" inputmode="numeric" value="${al.mins||25}"></div>
+    <div id="almSchBox" style="display:${window._almType==='scheduled'?'block':'none'}"><div class="f-label">时间</div><input id="almAt" type="datetime-local" value="${al.at||''}"></div>`;
   openModal(`<h3>${t?'✏️ 编辑任务':'✅ 新增任务'} <button class="x" onclick="closeModal()">✕</button></h3>
     ${fd?`<p class="sub" style="margin:0 0 6px">📆 将创建在 ${fd}（当日任务仅该天生效，循环任务从该天开始）</p>`:''}
     <div class="f-label">任务名称</div>
@@ -2273,6 +2525,7 @@ function openTaskModal(id,forDate){
         <div class="cat-wrap">${WEEK.map((w,i)=>`<button class="cat-item wk ${t&&(t.weekdays||[]).includes(i)?'on':''}" data-w="${i}" onclick="this.classList.toggle('on')">周${w}</button>`).join('')}</div>
       </div>
     </div>
+    ${almSec}
     <button class="btn btn-coral btn-block mt16" onclick="saveTask('${id||''}')">${t?'保存修改':'创建任务'}</button>`);
   window._tkType=t?t.type:'temp';
   window._repType=t?(t.repeatType||'forever'):'forever';
@@ -2290,16 +2543,27 @@ function pickRep(v){
   $('#repDaysBox').style.display=v==='days'?'block':'none';
   $('#repWeekBox').style.display=v==='weekly'?'block':'none';
 }
+function pickAlarm(v){
+  window._almType=v;
+  const seg=$('#almSeg');
+  if(seg)seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',(v==='none'&&x.textContent==='无')||(v==='countdown'&&x.textContent==='倒计时')||(v==='scheduled'&&x.textContent==='定时')));
+  const cd=$('#almCdBox'),sc=$('#almSchBox');
+  if(cd)cd.style.display=v==='countdown'?'block':'none';
+  if(sc)sc.style.display=v==='scheduled'?'block':'none';
+}
 function saveTask(id){
   const title=$('#tkTitle').value.trim();if(!title){toast('请填写任务名称');return;}
   const type=window._tkType,repeatType=window._repType;
   const weekdays=[...document.querySelectorAll('.cat-item.wk.on')].map(b=>Number(b.dataset.w));
   if(type==='repeat'&&repeatType==='weekly'&&!weekdays.length){toast('请选择每周哪几天');return;}
+  let alarm={type:'none',mins:0,at:'',on:false,deadline:0};
+  if(window._almType==='countdown'){const m=Math.max(1,Number($('#almMins')?$('#almMins').value:25)||25);alarm={type:'countdown',mins:m,deadline:Date.now()+m*60000,on:true};}
+  else if(window._almType==='scheduled'){const v=$('#almAt')?$('#almAt').value:'';if(v)alarm={type:'scheduled',at:v,on:true};}
   if(id){
     const t=S.tasks.find(x=>x.id===id);
-    Object.assign(t,{title,type,repeatType:type==='repeat'?repeatType:null,repeatN:Number($('#repN')?$('#repN').value:7)||7,weekdays});
+    Object.assign(t,{title,type,repeatType:type==='repeat'?repeatType:null,repeatN:Number($('#repN')?$('#repN').value:7)||7,weekdays,alarm});
   }else{
-    S.tasks.push({id:uid(),title,type,createdDate:window._tkDate||today(),repeatType:type==='repeat'?repeatType:null,repeatN:Number($('#repN')?$('#repN').value:7)||7,weekdays,endedDate:null});
+    S.tasks.push({id:uid(),title,type,createdDate:window._tkDate||today(),repeatType:type==='repeat'?repeatType:null,repeatN:Number($('#repN')?$('#repN').value:7)||7,weekdays,endedDate:null,alarm,timer:{acc:0,running:false,startedAt:0},note:''});
   }
   closeModal();commit();toast(id?'已保存':'任务已创建');
 }
@@ -2616,6 +2880,9 @@ function applyLandscape(){
 window.addEventListener('resize',applyLandscape);
 window.addEventListener('orientationchange',()=>setTimeout(applyLandscape,80));
 applyLandscape();
+/* 任务闹钟 / 计时：每秒检测倒计时与定时，每 10 秒静默保存计时进度 */
+setInterval(alarmTick,1000);
+setInterval(()=>{let run=false;S.tasks.forEach(t=>{if(t.timer&&t.timer.running)run=true;});if(run)save();},10000);
 (function showSplash(){
   const now=new Date();
   const wd=['日','一','二','三','四','五','六'][now.getDay()];
