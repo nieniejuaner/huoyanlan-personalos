@@ -1086,7 +1086,6 @@ const TABS=[
   {id:'study',ic:'✅',name:'任务'},
   {id:'money',ic:'💰',name:'账目'},
   {id:'shift',ic:'📅',name:'排班'},
-  {id:'gift',ic:'🧧',name:'份子钱'},
   {id:'me',ic:'👤',name:'我的'}
 ];
 let cur='home';
@@ -3179,30 +3178,6 @@ function saveExpense(){
 }
 
 /* ================= 份子钱台账（独立板块） ================= */
-function pageGift(){
-  const gifts=S.gifts.slice().sort((a,x)=>x.ts-a.ts);
-  return `
-  <div class="page-anim">
-    <div class="row" style="margin:4px 2px 14px">
-      <div class="h1 grow">🧧 份子钱台账</div>
-      <button class="btn btn-grass btn-sm" style="padding:8px 14px" onclick="openGiftModal()">＋ 新增记录</button>
-    </div>
-    <div class="card">
-      <div class="card-title">🎁 份子钱专项台账 <span class="sub" style="font-weight:400">送出从存钱账户扣减</span></div>
-      <div class="seg" style="margin-bottom:6px">
-        <button class="${giftTab==='in'?'on':''}" style="${giftTab==='in'?'color:#1f5b57':''}" onclick="giftTab='in';render()">收到份子钱</button>
-        <button class="${giftTab==='out'?'on':''}" style="${giftTab==='out'?'color:#c98d88':''}" onclick="giftTab='out';render()">送出份子钱</button>
-        <button class="${giftTab==='all'?'on':''}" onclick="giftTab='all';render()">全部往来</button>
-      </div>
-      <input placeholder="🔍 按姓名 / 事件筛选人情往来" value="${esc(giftQuery)}" style="margin:8px 0" oninput="filterGift(this.value)">
-      <div id="giftList">
-      ${gifts.length?gifts.map(giftRow).join(''):`<div class="empty">暂无${giftTab==='all'?'往来':(giftTab==='in'?'收到':'送出')}记录</div>`}
-      </div>
-      <div id="giftSummary">${giftSummaryHTML()}</div>
-      <button class="btn btn-grass btn-block mt8" onclick="openGiftModal()">＋ 新增份子记录</button>
-    </div>
-  </div>`;
-}
 
 /* ================= 份子钱 ================= */
 function openGiftModal(){
@@ -3330,7 +3305,7 @@ function pushChat(q){
 }
 
 /* ================= 渲染入口 ================= */
-const PAGES={home:pageHome,hub:pageHub,study:pageStudy,money:pageMoney,shift:pageShift,gift:pageGift,me:pageMe,acct:pageAcct};
+const PAGES={home:pageHome,hub:pageHub,study:pageStudy,money:pageMoney,shift:pageShift,me:pageMe,acct:pageAcct};
 function render(){
   let html=navHistory.length>0?`<div class="back-bar" onclick="goback()"><span class="bk">‹</span>返回</div>`:'';
   html+=PAGES[cur]();
