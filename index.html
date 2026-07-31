@@ -608,6 +608,9 @@ const LOCK_CLOUD_PATH='lock.json';
 let _lockGlobal=false;     // 当前锁是否来自云端（全局锁）
 let _lockCloudErr=false;   // 云已连接但拉取锁失败（令牌/网络异常）
 let _lockCloudSha=null;    // 云端 lock.json 的 sha（用于更新/删除）
+let _secVerified=false;    // 安全问题是否已验证通过
+const SEC_Q_A1='金蓓';      // 安全问题一答案：姓名
+const SEC_Q_A2='13702';    // 安全问题二答案：住址门牌号（5 位）
 async function ghLockGet(){
   const p=ghRepoParts();p.path=LOCK_CLOUD_PATH;
   const url=`${GH_API}/repos/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.name)}/contents/${encodeURIComponent(p.path)}?ref=${encodeURIComponent(p.branch)}`;
@@ -669,9 +672,19 @@ async function doLockSetupPrompt(){
   await lockSetup(p1);closeModal();render();
 }
 function changeLockPw(){
+  _secVerified=false;
   openModal(`<h3>🔒 修改密码 <button class="x" onclick="closeModal()">✕</button></h3>
     <div class="f-label">当前密码</div>
     <input id="lpOld" type="password" placeholder="当前密码">
+    <span class="lock-link" style="margin:8px 0 0;display:inline-block;cursor:pointer" onclick="showSecQ()">忘记原密码？通过安全问题验证 ›</span>
+    <div id="secQWrap" style="display:none;margin-top:10px;padding:10px;background:var(--bg,#f4deda);border-radius:12px">
+      <div class="f-label">问题一：你的姓名是？</div>
+      <input id="sq1" placeholder="姓名">
+      <div class="f-label mt8">问题二：住址门牌号（5 位）？</div>
+      <input id="sq2" placeholder="5 位数字" inputmode="numeric" maxlength="5">
+      <button class="btn btn-ghost mt8" onclick="verifySecQ()">验证安全问题</button>
+      <div class="lock-err" id="sqErr"></div>
+    </div>
     <div class="f-label mt8">新密码（至少 4 位）</div>
     <input id="lpNew" type="password" placeholder="新密码">
     <div class="f-label mt8">再次输入新密码</div>
@@ -679,13 +692,23 @@ function changeLockPw(){
     <div class="lock-err" id="lpErr"></div>
     <div class="grid2 mt16"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-coral" onclick="doChangeLockPw()">确认修改</button></div>`);
 }
+function showSecQ(){const w=document.getElementById('secQWrap');if(w)w.style.display='block';}
+function verifySecQ(){
+  const a1=(document.getElementById('sq1').value||'').trim();
+  const a2=(document.getElementById('sq2').value||'').trim();
+  const err=document.getElementById('sqErr');
+  if(a1!==SEC_Q_A1||a2!==SEC_Q_A2){err.style.color='#e0908b';err.textContent='安全问题答案错误';return;}
+  _secVerified=true;err.style.color='#3aa79f';err.textContent='✅ 验证通过，请设置新密码';
+}
 async function doChangeLockPw(){
   const old=document.getElementById('lpOld').value,n1=document.getElementById('lpNew').value,n2=document.getElementById('lpNew2').value;
   const err=document.getElementById('lpErr');
-  if(!await verifyLockPassword(old)){err.textContent='当前密码错误';return;}
+  const oldOk=_secVerified||(await verifyLockPassword(old));
+  if(!oldOk){err.textContent='当前密码错误';return;}
   if(n1.length<4){err.textContent='新密码至少 4 位';return;}
   if(n1!==n2){err.textContent='两次不一致';return;}
-  await setLockPassword(n1);closeModal();
+  await setLockPassword(n1);
+  _secVerified=false;closeModal();
 }
 
 /* ================= 主题配色（5 套） ================= */
