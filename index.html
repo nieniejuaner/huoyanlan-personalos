@@ -293,14 +293,21 @@ input,select,textarea{border:2.5px solid var(--outline);box-shadow:3px 3px 0 var
 .acct-box:nth-child(3){transform:rotate(-.4deg)}
 /* 小狗元素装饰层 */
 #dogDeco{position:fixed;inset:0;pointer-events:none;z-index:55}
-#dogDeco .dd{position:absolute;font-size: calc(22px * var(--fs));opacity:.82;filter:drop-shadow(2px 2px 0 rgba(255,255,255,.6))}
+#dogDeco .dd{position:absolute;font-size:calc(var(--ds,22) * 1px * var(--fs));opacity:.82;filter:drop-shadow(2px 2px 0 rgba(255,255,255,.6))}
 #dogDeco .d-paw{left:12px;bottom:calc(76px + env(safe-area-inset-bottom));transform:rotate(-12deg)}
 #dogDeco .d-bone{right:14px;top:calc(56px + env(safe-area-inset-bottom));transform:rotate(12deg)}
 #dogDeco .d-pup{right:14px;bottom:calc(150px + env(safe-area-inset-bottom));transform:rotate(-8deg)}
+/* 新增装饰元素：更多小狗 / 爪印 / 骨头散落页面 */
+#dogDeco .d-paw2{left:14px;top:calc(66px + env(safe-area-inset-bottom));--ds:18;transform:rotate(16deg);opacity:.7}
+#dogDeco .d-bone2{left:22px;top:calc(168px + env(safe-area-inset-bottom));--ds:20;transform:rotate(-14deg);opacity:.7}
+#dogDeco .d-pup2{right:16px;top:calc(152px + env(safe-area-inset-bottom));--ds:20;transform:rotate(9deg);opacity:.72}
+#dogDeco .d-paw3{right:18px;top:calc(280px + env(safe-area-inset-bottom));--ds:17;transform:rotate(-10deg);opacity:.6}
+#dogDeco .d-bone3{left:18px;top:calc(300px + env(safe-area-inset-bottom));--ds:18;transform:rotate(15deg);opacity:.62}
+#dogDeco .d-pup3{right:14px;bottom:calc(250px + env(safe-area-inset-bottom));--ds:19;transform:rotate(-12deg);opacity:.66}
 /* ===== 点击特效：小狗爪印 ===== */
-.paw-pop{position:fixed;z-index:82;pointer-events:none;font-size: calc(26px * var(--fs));line-height:1;transform:translate(-50%,-50%);animation:pawPop .72s ease-out forwards;will-change:transform,opacity}
-.paw-pop.s2{font-size: calc(19px * var(--fs))}
-@keyframes pawPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(var(--pr,0deg))}18%{opacity:1}55%{opacity:1}100%{opacity:0;transform:translate(-50%,-150%) scale(1.12) rotate(var(--pr,0deg))}}
+/* 点击特效：随机狗爪印🐾 / 骨头🦴 / 小狗🐶 / 🐕 飘起淡出，1~3 个/次，跟随 --fs 字号缩放 */
+.paw-pop{position:fixed;z-index:82;pointer-events:none;font-size:calc(var(--pw,26) * 1px * var(--fs));line-height:1;transform:translate(-50%,-50%);animation:pawPop .8s cubic-bezier(.2,.7,.3,1) forwards;will-change:transform,opacity}
+@keyframes pawPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(var(--pr,0deg))}16%{opacity:1}62%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--pd,0px)),-160%) scale(1.16) rotate(var(--pr,0deg))}}
 /* ===== 可拖动悬浮速记窗 ===== */
 .float-win{position:fixed;z-index:65;width:228px;background:var(--card);border:2.5px solid var(--outline);border-radius:18px;box-shadow:5px 5px 0 var(--hard);display:none;flex-direction:column;overflow:hidden}
 .float-win.show{display:flex}
@@ -363,7 +370,7 @@ html.land{
   <div id="fabMenu" class="fab-menu"></div>
   <button id="fab" class="fab" title="拖动可移动 · 点击展开">＋</button>
   <nav id="tabbar" class="tabbar"></nav>
-  <div id="dogDeco"><span class="dd d-paw">🐾</span><span class="dd d-bone">🦴</span><span class="dd d-pup">🐶</span></div>
+  <div id="dogDeco"><span class="dd d-paw">🐾</span><span class="dd d-bone">🦴</span><span class="dd d-pup">🐶</span><span class="dd d-paw2">🐾</span><span class="dd d-bone2">🦴</span><span class="dd d-pup2">🐕</span><span class="dd d-paw3">🐾</span><span class="dd d-bone3">🦴</span><span class="dd d-pup3">🐶</span></div>
   <div id="floatWin" class="float-win">
     <div class="fw-head" id="fwHead"><span>📌</span><span class="fw-title">悬浮速记</span><button class="fw-x" onclick="toggleFloatWin(false)" title="收起">×</button></div>
     <div class="fw-body"><textarea id="fwText" placeholder="随手记点什么…拖动顶部标题栏可移动位置" oninput="saveFloatNote()"></textarea><div class="fw-tip">拖动标题栏移动 · 内容自动保存</div></div>
@@ -3335,8 +3342,9 @@ _navT.title='收起 / 展开侧栏';
 _navT.onclick=()=>document.documentElement.classList.toggle('nav-collapsed');
 document.body.appendChild(_navT);
 
-/* 点击特效：在点击位置弹出小狗爪印🐾，向上飘起并淡出（拖拽/滚动/输入框不触发） */
+/* 点击特效：随机狗爪印🐾 / 骨头🦴 / 小狗🐶 飘起淡出（爪印权重更高，1~3 个/次；拖拽/滚动/输入框不触发） */
 (function(){
+  const FX=['🐾','🐾','🐾','🐾','🦴','🐶','🐕']; // 爪印出现概率更高
   let sx=0,sy=0;
   document.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY;},{passive:true});
   document.addEventListener('pointerup',e=>{
@@ -3344,14 +3352,21 @@ document.body.appendChild(_navT);
     if(e.target.closest('input,textarea,select'))return;
     const dx=e.clientX-sx,dy=e.clientY-sy;
     if(Math.hypot(dx,dy)>10)return; // 拖拽或滚动，不触发
-    const el=document.createElement('div');
-    el.className='paw-pop'+(Math.random()<0.35?' s2':'');
-    el.textContent='🐾';
-    el.style.left=e.clientX+'px';
-    el.style.top=e.clientY+'px';
-    el.style.setProperty('--pr',(Math.random()*40-20).toFixed(1)+'deg');
-    document.body.appendChild(el);
-    setTimeout(()=>el.remove(),740);
+    const n=1+Math.floor(Math.random()*3); // 每次 1~3 个特效元素
+    for(let i=0;i<n;i++){
+      const el=document.createElement('div');
+      el.className='paw-pop';
+      el.textContent=FX[Math.floor(Math.random()*FX.length)];
+      el.style.left=(e.clientX+(Math.random()*44-22))+'px';
+      el.style.top=(e.clientY+(Math.random()*26-13))+'px';
+      el.style.setProperty('--pw',(18+Math.random()*20).toFixed(0));      // 基础字号 18~38px
+      el.style.setProperty('--pr',(Math.random()*56-28).toFixed(1)+'deg'); // 随机旋转
+      el.style.setProperty('--pd',(Math.random()*64-32).toFixed(0)+'px');  // 随机横向漂移
+      const dur=(620+Math.random()*280)|0;
+      el.style.animationDuration=dur+'ms';
+      document.body.appendChild(el);
+      setTimeout(()=>el.remove(),dur+80);
+    }
   },{passive:true});
 })();
 
