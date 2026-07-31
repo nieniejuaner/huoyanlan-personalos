@@ -297,6 +297,10 @@ input,select,textarea{border:2.5px solid var(--outline);box-shadow:3px 3px 0 var
 #dogDeco .d-paw{left:12px;bottom:calc(76px + env(safe-area-inset-bottom));transform:rotate(-12deg)}
 #dogDeco .d-bone{right:14px;top:calc(56px + env(safe-area-inset-bottom));transform:rotate(12deg)}
 #dogDeco .d-pup{right:14px;bottom:calc(150px + env(safe-area-inset-bottom));transform:rotate(-8deg)}
+/* ===== 点击特效：小狗爪印 ===== */
+.paw-pop{position:fixed;z-index:82;pointer-events:none;font-size:26px;line-height:1;transform:translate(-50%,-50%);animation:pawPop .72s ease-out forwards;will-change:transform,opacity}
+.paw-pop.s2{font-size:19px}
+@keyframes pawPop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(var(--pr,0deg))}18%{opacity:1}55%{opacity:1}100%{opacity:0;transform:translate(-50%,-150%) scale(1.12) rotate(var(--pr,0deg))}}
 /* ===== 可拖动悬浮速记窗 ===== */
 .float-win{position:fixed;z-index:65;width:228px;background:var(--card);border:2.5px solid var(--outline);border-radius:18px;box-shadow:5px 5px 0 var(--hard);display:none;flex-direction:column;overflow:hidden}
 .float-win.show{display:flex}
@@ -3355,6 +3359,26 @@ _navT.innerHTML='☰';
 _navT.title='收起 / 展开侧栏';
 _navT.onclick=()=>document.documentElement.classList.toggle('nav-collapsed');
 document.body.appendChild(_navT);
+
+/* 点击特效：在点击位置弹出小狗爪印🐾，向上飘起并淡出（拖拽/滚动/输入框不触发） */
+(function(){
+  let sx=0,sy=0;
+  document.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY;},{passive:true});
+  document.addEventListener('pointerup',e=>{
+    if(e.target.closest('.fab,.float-win .fw-head,#navToggle'))return;
+    if(e.target.closest('input,textarea,select'))return;
+    const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(Math.hypot(dx,dy)>10)return; // 拖拽或滚动，不触发
+    const el=document.createElement('div');
+    el.className='paw-pop'+(Math.random()<0.35?' s2':'');
+    el.textContent='🐾';
+    el.style.left=e.clientX+'px';
+    el.style.top=e.clientY+'px';
+    el.style.setProperty('--pr',(Math.random()*40-20).toFixed(1)+'deg');
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),740);
+  },{passive:true});
+})();
 
 /* 已取消应用锁：直接启动应用；启动时从云端恢复数据 */
 if(!S)S=load();
