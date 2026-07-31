@@ -327,6 +327,20 @@ html.land{
 .kv>b{font-size:14px}
 .cmd-box textarea{width:100%;min-height:78px;padding:10px;border:2.5px solid var(--outline);border-radius:10px;font-size:15px;resize:vertical;box-sizing:border-box;background:var(--card)}
 .cmd-box textarea:focus{border-color:var(--coral)}
+.hidden-init{opacity:0!important;visibility:hidden!important}
+/* ================= 应用锁（访问密码） ================= */
+.lock-screen{position:fixed;inset:0;z-index:10000;background:linear-gradient(160deg,var(--bg) 0%,#ffffff 100%);display:flex;align-items:center;justify-content:center;padding:24px}
+.lock-card{width:100%;max-width:340px;background:var(--card,#fff);border-radius:22px;padding:30px 22px;box-shadow:0 18px 50px rgba(180,140,140,.18);text-align:center}
+.lock-logo{font-size:46px;animation:floaty 2.4s ease-in-out infinite}
+.lock-title{font-weight:800;font-size:19px;margin-top:10px;color:var(--ink)}
+.lock-sub{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.6}
+.lock-input{width:100%;margin-top:16px;padding:13px 14px;font-size:16px;border:1.5px solid #ecd9d6;border-radius:14px;outline:none;box-sizing:border-box;text-align:center;letter-spacing:2px}
+.lock-input:focus{border-color:#e0908b}
+.lock-btn{width:100%;margin-top:14px;padding:13px;border:none;border-radius:14px;background:linear-gradient(135deg,#f1bfbc,#c98d88);color:#fff;font-size:16px;font-weight:700;cursor:pointer}
+.lock-btn:active{transform:scale(.98)}
+.lock-err{color:#e0908b;font-size:13px;margin-top:10px;min-height:18px}
+.lock-link{display:inline-block;margin-top:14px;font-size:12px;color:var(--sub);cursor:pointer;text-decoration:underline}
+.lock-hint{font-size:11px;color:var(--sub);margin-top:16px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -353,6 +367,7 @@ html.land{
 <div id="modalRoot"></div>
 <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="onAvatarPicked(this)">
 <div id="toast" class="toast"></div>
+<div id="lockScreen" class="lock-screen" style="display:none"></div>
 <script>
 /* ================= 数据层（本地存储，隐私优先） ================= */
 const KEY='huoyanlan_personalos_v1';
@@ -382,10 +397,230 @@ const SHIFT_TYPES=[
   {key:'值班',color:'#f7d9a8'}
 ];
 const shiftColor=t=>{const f=SHIFT_TYPES.find(x=>x.key===t);return f?f.color:'#e6e6e6';};
-let S=load();
-function load(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);const s=Object.assign(JSON.parse(JSON.stringify(DEF)),d);(s.shifts||[]).forEach(sh=>{if(sh.sdate===undefined){sh.sdate=sh.date||'';sh.stime=sh.start||'';sh.edate=sh.date||sh.sdate;sh.etime=sh.end||'';}});return s;}}catch(e){}return JSON.parse(JSON.stringify(DEF));}
-function save(){S._ts=S._ts||Date.now();localStorage.setItem(KEY,JSON.stringify(S));scheduleSync();}
+let S=null;
+function mergeDef(d){const s=Object.assign(JSON.parse(JSON.stringify(DEF)),d||{});(s.shifts||[]).forEach(sh=>{if(sh.sdate===undefined){sh.sdate=sh.date||'';sh.stime=sh.start||'';sh.edate=sh.date||sh.sdate;sh.etime=sh.end||'';}});return s;}
+function load(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);return mergeDef(d);}}catch(e){}return mergeDef({});}
+async function save(){if(!_sessKey&&!_sessXor)return;S._ts=S._ts||Date.now();try{await lockStore(S);}catch(e){console.warn('save',e);}scheduleSync();}
 function commit(){save();render();}
+
+/* ================= 应用锁（访问密码 · 本地加密） ================= */
+const LOCK_KEY='huoyanlan_lock_v1';
+let _sessKey=null;        // 解锁后的 AES CryptoKey（HTTPS）
+let _sessXor=null;        // 解锁后的 XOR 密钥串（HTTP 兜底）
+let _lockSalt=null;       // PBKDF2 salt
+let _hasCrypto=!!(window.crypto&&crypto.subtle);
+let _migratePlain=null;   // 首次设密码时迁移的旧明文数据
+let _booted=false;        // 应用是否已完整启动（避免重复初始化）
+let _alarmStarted=false;  // 计时器是否已启动
+
+function randBytes(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return a;}
+async function deriveAes(pw,salt){
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:120000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function aesGcmEncrypt(key,str){
+  const iv=randBytes(12);
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv},key,new TextEncoder().encode(str));
+  return {iv:Array.from(iv),ct:Array.from(new Uint8Array(ct))};
+}
+async function aesGcmDecrypt(key,ivArr,ctArr){
+  const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:new Uint8Array(ivArr)},key,new Uint8Array(ctArr));
+  return new TextDecoder().decode(pt);
+}
+function hashStr(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}return (h>>>0).toString(16);}
+function xorStr(str,key){
+  const enc=new TextEncoder().encode(str);const out=new Uint8Array(enc.length);
+  for(let i=0;i<enc.length;i++)out[i]=enc[i]^key.charCodeAt(i%key.length);
+  let bin='';for(let i=0;i<out.length;i++)bin+=String.fromCharCode(out[i]);
+  return btoa(bin);
+}
+function xorStrBack(b64,key){
+  const bin=atob(b64);const out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i)^key.charCodeAt(i%key.length);
+  return new TextDecoder().decode(out);
+}
+async function lockEncrypt(obj){
+  const json=JSON.stringify(obj);
+  if(_hasCrypto&&_sessKey){const b=await aesGcmEncrypt(_sessKey,json);return {v:2,kind:'aes',iv:b.iv,ct:b.ct};}
+  if(_sessXor){return {v:2,kind:'xor',ct:xorStr(json,_sessXor)};}
+  throw new Error('未解锁');
+}
+async function lockDecrypt(rec){
+  if(rec&&rec.kind==='aes'&&_sessKey){return JSON.parse(await aesGcmDecrypt(_sessKey,rec.iv,rec.ct));}
+  if(rec&&rec.kind==='xor'&&_sessXor){return JSON.parse(xorStrBack(rec.ct,_sessXor));}
+  if(rec&&!rec.kind){return rec;} // 兼容未加密的旧明文
+  throw new Error('无法解密');
+}
+async function lockStore(obj){localStorage.setItem(KEY,JSON.stringify(await lockEncrypt(obj)));}
+function probePlain(){
+  try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);if(d&&typeof d==='object'&&!d.kind)return d;}}catch(e){}
+  return null;
+}
+async function lockSetup(pw){
+  try{
+    const salt=_hasCrypto?randBytes(16):'huoyanlan';
+    let rec;
+    if(_hasCrypto){
+      _sessKey=await deriveAes(pw,salt);_lockSalt=salt;
+      const check=await aesGcmEncrypt(_sessKey,'huoyanlan-ok');
+      rec={v:2,kind:'aes',salt:Array.from(salt),check:check};
+    }else{
+      _sessXor=hashStr(pw+'huoyanlan');
+      rec={v:2,kind:'xor',salt:'huoyanlan',check:hashStr(pw+'huoyanlan')};
+    }
+    localStorage.setItem(LOCK_KEY,JSON.stringify(rec));
+    const data=_migratePlain||JSON.parse(JSON.stringify(DEF));
+    await lockStore(data);_migratePlain=null;
+    toast('密码已设置 🔒');
+    afterUnlock();
+  }catch(e){toast('设置失败：'+e.message);}
+}
+async function lockUnlock(pw){
+  const raw=localStorage.getItem(LOCK_KEY);
+  if(!raw){return lockSetup(pw);}
+  let rec;try{rec=JSON.parse(raw);}catch(e){toast('锁配置损坏');return false;}
+  try{
+    if(rec.kind==='aes'){
+      if(!_hasCrypto){toast('请使用 GitHub Pages(HTTPS) 链接打开以解锁');return false;}
+      const salt=new Uint8Array(rec.salt);
+      _sessKey=await deriveAes(pw,salt);
+      const ok=await aesGcmDecrypt(_sessKey,rec.check.iv,rec.check.ct);
+      if(ok!=='huoyanlan-ok'){_sessKey=null;toast('密码错误');return false;}
+      _lockSalt=salt;
+    }else{
+      _sessXor=hashStr(pw+'huoyanlan');
+      if(hashStr(pw+'huoyanlan')!==rec.check){_sessXor=null;toast('密码错误');return false;}
+    }
+    const dr=localStorage.getItem(KEY);let data;
+    if(!dr){data=JSON.parse(JSON.stringify(DEF));}
+    else{try{data=await lockDecrypt(JSON.parse(dr));}catch(e){_sessKey=null;_sessXor=null;toast('解密失败，密码可能错误');return false;}}
+    S=mergeDef(data);
+    afterUnlock();
+    return true;
+  }catch(e){_sessKey=null;_sessXor=null;toast('解锁失败');return false;}
+}
+async function verifyLockPassword(pw){
+  const raw=localStorage.getItem(LOCK_KEY);if(!raw)return false;
+  const rec=JSON.parse(raw);
+  if(rec.kind==='aes'){if(!_hasCrypto)return false;const k=await deriveAes(pw,new Uint8Array(rec.salt));try{return (await aesGcmDecrypt(k,rec.check.iv,rec.check.ct))==='huoyanlan-ok';}catch(e){return false;}}
+  return hashStr(pw+'huoyanlan')===rec.check;
+}
+async function setLockPassword(newPw){
+  const salt=_hasCrypto?randBytes(16):'huoyanlan';
+  let rec;
+  if(_hasCrypto){_sessKey=await deriveAes(newPw,salt);_lockSalt=salt;const check=await aesGcmEncrypt(_sessKey,'huoyanlan-ok');rec={v:2,kind:'aes',salt:Array.from(salt),check:check};}
+  else{_sessXor=hashStr(newPw+'huoyanlan');rec={v:2,kind:'xor',salt:'huoyanlan',check:hashStr(newPw+'huoyanlan')};}
+  localStorage.setItem(LOCK_KEY,JSON.stringify(rec));
+  await lockStore(S);
+  toast('密码已更新 🔒');
+}
+function afterUnlock(){
+  const ls=document.getElementById('lockScreen');if(ls)ls.style.display='none';
+  if(!_booted){_booted=true;fullBoot();}else{render();}
+}
+function fullBoot(){
+  applyTheme(curTheme());renderFab();render();initCloud();
+  loadFloat();initFloatDrag();if(floatState.show)toggleFloatWin(true);
+  loadFabPos();placeFab();initFabDrag();
+  if(!_alarmStarted){_alarmStarted=true;setInterval(alarmTick,1000);setInterval(timerAutoSave,10000);}
+  showSplash();
+}
+function timerAutoSave(){if(!S)return;let run=false;S.tasks.forEach(t=>{if(t.timer&&t.timer.running)run=true;});if(run)save();}
+function lockScreenHTML(){
+  const hasLock=!!localStorage.getItem(LOCK_KEY);
+  if(hasLock){
+    return `<div class="lock-card">
+      <div class="lock-logo">🌺</div>
+      <div class="lock-title">火焰兰 PersonalOS</div>
+      <div class="lock-sub">请输入密码以查看</div>
+      <input id="lockPw" class="lock-input" type="password" placeholder="密码" autocomplete="off" onkeydown="if(event.key==='Enter')lockSubmitUnlock()">
+      <button class="lock-btn" onclick="lockSubmitUnlock()">解 锁</button>
+      <div class="lock-err" id="lockErr"></div>
+      <span class="lock-link" onclick="lockForget()">忘记密码？清除并重置</span>
+    </div>`;
+  }
+  _migratePlain=probePlain();
+  return `<div class="lock-card">
+    <div class="lock-logo">🌺</div>
+    <div class="lock-title">设置访问密码</div>
+    <div class="lock-sub">为火焰兰加一把锁，开启后每次打开都需输入密码</div>
+    <input id="lockPw1" class="lock-input" type="password" placeholder="设置密码（至少 4 位）" autocomplete="off" onkeydown="if(event.key==='Enter')lockSubmitSetup()">
+    <input id="lockPw2" class="lock-input" type="password" placeholder="再次输入确认" autocomplete="off" onkeydown="if(event.key==='Enter')lockSubmitSetup()">
+    <button class="lock-btn" onclick="lockSubmitSetup()">开 启 密 码 锁</button>
+    <div class="lock-err" id="lockErr"></div>
+    <div class="lock-hint">⚠️ 忘记密码将无法恢复数据，请牢记；建议先到「我的 → 数据管理」导出备份。</div>
+  </div>`;
+}
+function setupLockScreen(){
+  const ls=document.getElementById('lockScreen');if(!ls)return;
+  ls.innerHTML=lockScreenHTML();
+  ls.style.display='flex';
+  const inp=ls.querySelector('input');if(inp)inp.focus();
+}
+function lockSubmitSetup(){
+  const p1=document.getElementById('lockPw1').value,p2=document.getElementById('lockPw2').value;
+  const err=document.getElementById('lockErr');
+  if(p1.length<4){err.textContent='密码至少 4 位';return;}
+  if(p1!==p2){err.textContent='两次输入不一致';return;}
+  lockSetup(p1);
+}
+async function lockSubmitUnlock(){
+  const pw=document.getElementById('lockPw').value;
+  const ok=await lockUnlock(pw);
+  if(!ok){const i=document.getElementById('lockPw');if(i)i.value='';}
+}
+function lockNow(){
+  _sessKey=null;_sessXor=null;S=null;
+  setupLockScreen();
+  toast('已锁定');
+}
+function lockForget(){
+  openModal(`<h3>⚠️ 忘记密码 <button class="x" onclick="closeModal()">✕</button></h3>
+    <p style="font-size:14px;color:var(--sub)">清除密码会<b style="color:#e0908b">同时删除本机所有加密数据</b>（无法恢复）。云端加密备份需你自行在 GitHub 删除。请输入「清除」确认。</p>
+    <input id="forgetConfirm" placeholder="清除">
+    <div class="grid2 mt16"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-coral" onclick="doLockForget()">确认清除</button></div>`);
+}
+function doLockForget(){
+  if((document.getElementById('forgetConfirm').value||'').trim()!=='清除'){toast('请输入「清除」确认');return;}
+  localStorage.removeItem(LOCK_KEY);localStorage.removeItem(KEY);
+  closeModal();setupLockScreen();
+  toast('已清除，请重新设置密码');
+}
+function lockSetupPrompt(){
+  openModal(`<h3>🔒 设置访问密码 <button class="x" onclick="closeModal()">✕</button></h3>
+    <p class="sub" style="font-size:13px">开启后每次打开需输入密码，数据将以加密形式存储。</p>
+    <div class="f-label">设置密码（至少 4 位）</div>
+    <input id="sp1" type="password" placeholder="密码">
+    <div class="f-label mt8">再次输入</div>
+    <input id="sp2" type="password" placeholder="确认">
+    <div class="lock-err" id="spErr"></div>
+    <div class="grid2 mt16"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-coral" onclick="doLockSetupPrompt()">开启密码锁</button></div>`);
+}
+async function doLockSetupPrompt(){
+  const p1=document.getElementById('sp1').value,p2=document.getElementById('sp2').value,err=document.getElementById('spErr');
+  if(p1.length<4){err.textContent='密码至少 4 位';return;}
+  if(p1!==p2){err.textContent='两次不一致';return;}
+  await lockSetup(p1);closeModal();render();
+}
+function changeLockPw(){
+  openModal(`<h3>🔒 修改密码 <button class="x" onclick="closeModal()">✕</button></h3>
+    <div class="f-label">当前密码</div>
+    <input id="lpOld" type="password" placeholder="当前密码">
+    <div class="f-label mt8">新密码（至少 4 位）</div>
+    <input id="lpNew" type="password" placeholder="新密码">
+    <div class="f-label mt8">再次输入新密码</div>
+    <input id="lpNew2" type="password" placeholder="确认新密码">
+    <div class="lock-err" id="lpErr"></div>
+    <div class="grid2 mt16"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-coral" onclick="doChangeLockPw()">确认修改</button></div>`);
+}
+async function doChangeLockPw(){
+  const old=document.getElementById('lpOld').value,n1=document.getElementById('lpNew').value,n2=document.getElementById('lpNew2').value;
+  const err=document.getElementById('lpErr');
+  if(!await verifyLockPassword(old)){err.textContent='当前密码错误';return;}
+  if(n1.length<4){err.textContent='新密码至少 4 位';return;}
+  if(n1!==n2){err.textContent='两次不一致';return;}
+  await setLockPassword(n1);closeModal();
+}
 
 /* ================= 主题配色（5 套） ================= */
 const THEMES=[
@@ -469,12 +704,12 @@ function scheduleSync(){
 }
 async function ghGet(){
   const res=await fetch(ghFileUrl(),{headers:ghHeaders()});
-  if(res.status===404)return {ok:true,sha:null,data:null};
+  if(res.status===404)return {ok:true,sha:null,raw:null};
   if(res.status===401)return {ok:false,err:'令牌无效或无权限（401）'};
   if(res.status===403)return {ok:false,err:'禁止访问（403，权限不足或额度用尽）'};
   if(!res.ok)return {ok:false,err:'HTTP '+res.status};
   const j=await res.json();
-  try{const data=JSON.parse(ghB64decode(j.content));return {ok:true,sha:j.sha,data};}
+  try{return {ok:true,sha:j.sha,raw:ghB64decode(j.content)};}
   catch(e){return {ok:false,err:'云端数据解析失败'};}
 }
 async function ghPut(content,sha){
@@ -489,15 +724,19 @@ async function ghPut(content,sha){
 }
 async function cloudPush(){
   if(!ghConnected())return;
+  if(!_sessKey&&!_sessXor)return; // 未解锁不推送
   S._ts=Date.now();
-  const payload=JSON.parse(JSON.stringify(S));
-  const raw=JSON.stringify(payload);
+  const payload=S;
+  const enc=await lockEncrypt(payload);
+  const raw=JSON.stringify(enc);
   if(raw.length>900000){cloudSetStatus('error','数据过大（含图片可能超 1MB），请先「清除缓存图片」');return;}
   cloudSetStatus('syncing');
   try{
     const g=await ghGet();
     if(!g.ok){cloudSetStatus('error',g.err);return;}
-    if(g.data&&(g.data._ts||0)>(payload._ts||0)){cloudSetStatus('ok','云端已有更新，已保留');cloudPull();return;}
+    let remoteTs=0;
+    if(g.raw){try{const rec=JSON.parse(g.raw);const obj=await lockDecrypt(rec);remoteTs=obj._ts||0;}catch(e){try{const obj=JSON.parse(g.raw);remoteTs=obj._ts||0;}catch(e2){}}}
+    if(remoteTs>(payload._ts||0)){cloudSetStatus('ok','云端已有更新，已保留');const rec=JSON.parse(g.raw);await cloudApply(await lockDecrypt(rec));return;}
     const res=await ghPut(ghB64encode(raw),g.sha);
     if(res.ok){cloudState.last=Date.now();cloudSetStatus('ok','已同步 · '+fmtClock(cloudState.last));}
     else if(res.status===401){cloudSetStatus('error','令牌无效（401）');}
@@ -506,18 +745,25 @@ async function cloudPush(){
     else{cloudSetStatus('error','上传失败 '+res.status);}
   }catch(e){cloudSetStatus('error','网络异常');}
 }
+async function cloudApply(obj){
+  if(!obj)return;
+  S=mergeDef(obj);save();
+  if(cur==='me')refreshCloudCard();else render();
+  toast('已从云端恢复');
+}
 async function cloudPull(){
   if(!ghConnected()){cloudSetStatus('off','未连接');return false;}
   cloudSetStatus('syncing');
   try{
     const g=await ghGet();
     if(!g.ok){cloudSetStatus('error',g.err);return false;}
-    if(!g.data){cloudSetStatus('ok','云端暂无数据');return false;}
-    const ct=g.data._ts||0;
+    if(!g.raw){cloudSetStatus('ok','云端暂无数据');return false;}
+    let obj;
+    try{obj=await lockDecrypt(JSON.parse(g.raw));}catch(e){try{obj=JSON.parse(g.raw);}catch(e2){cloudSetStatus('error','云端数据解析失败');return false;}}
+    const ct=obj._ts||0;
     if(!S._ts||ct>S._ts){
-      S=Object.assign(JSON.parse(JSON.stringify(DEF)),g.data);S._ts=ct;save();
+      await cloudApply(obj);
       cloudState.last=Date.now();cloudSetStatus('ok','已从云端恢复 · '+fmtClock(cloudState.last));
-      if(cur==='me')refreshCloudCard();else render();
       return true;
     }
     cloudSetStatus('ok','本地已是最新');
@@ -1462,6 +1708,7 @@ function beep(times){
 function ensureNotify(){if('Notification'in window&&Notification.permission==='default'){try{Notification.requestPermission();}catch(e){}}}
 function fireAlarm(t,label){beep(3);ensureNotify();if('Notification'in window&&Notification.permission==='granted'){try{new Notification('⏰ 火焰兰提醒',{body:label});}catch(e){}}toast('⏰ '+label);}
 function alarmTick(){
+  if(!S)return;
   const now=Date.now();let needSave=false;
   S.tasks.forEach(t=>{
     const tm=t.timer||{};
@@ -2275,6 +2522,7 @@ function parseBillPlain(lines){
 
 function pageMe(){
   const p=S.profile,st=S.settings,b=balances();
+  const locked=!!localStorage.getItem(LOCK_KEY);
   const goalPct=p.saveGoal>0?Math.min(100,Math.round(b.save/p.saveGoal*100)):0;
   return `
   <div class="page-anim">
@@ -2330,6 +2578,19 @@ function pageMe(){
       <div class="set-row" onclick="clearImages()" style="cursor:pointer"><span>🧹 清除缓存图片</span><span class="sub">›</span></div>
       <div class="set-row" onclick="resetData()" style="cursor:pointer;color:#e0908b"><span>⚠️ 重置数据</span><span class="sub">›</span></div>
     </div>
+
+    ${locked?`
+    <div class="card">
+      <div class="card-title">🔒 应用锁</div>
+      <div class="set-row" onclick="changeLockPw()" style="cursor:pointer"><span>🔑 修改密码</span><span class="sub">›</span></div>
+      <div class="set-row" onclick="lockNow()" style="cursor:pointer"><span>🚪 立即锁定</span><span class="sub">›</span></div>
+      <div class="sub mt8" style="font-size:11px;line-height:1.6">数据在本机与云端均以加密形式存储。忘记密码将<b style="color:#e0908b">无法恢复</b>。</div>
+    </div>`:`
+    <div class="card">
+      <div class="card-title">🔒 应用锁</div>
+      <div class="set-row" onclick="lockSetupPrompt()" style="cursor:pointer"><span>🔒 开启访问密码</span><span class="sub">设置 ›</span></div>
+      <div class="sub mt8" style="font-size:11px;line-height:1.6">开启后每次打开需输入密码，数据以加密形式存储。</div>
+    </div>`}
 
     <div class="card">
       <div class="card-title"><span>☁️ 云同步</span><span id="cloudStatusTxt" class="sub"></span></div>
@@ -2439,7 +2700,7 @@ function resetData(){
 }
 function doReset(){
   if($('#resetConfirm').value.trim()!=='重置'){toast('请输入「重置」确认');return;}
-  localStorage.removeItem(KEY);S=load();giftQuery='';giftSel={};expQuery='';expMonth='';expSel={};shiftMonth='';closeModal();toast('数据已重置');render();
+  S=mergeDef({});giftQuery='';giftSel={};expQuery='';expMonth='';expSel={};shiftMonth='';closeModal();toast('数据已重置');render();save();
 }
 </script>
 <script>
@@ -2860,15 +3121,6 @@ function render(){
   const box=$('#chatBox');if(box)box.scrollTop=box.scrollHeight;
 }
 applyTheme(curTheme());
-renderFab();
-render();
-initCloud();
-loadFloat();
-initFloatDrag();
-if(floatState.show)toggleFloatWin(true);
-loadFabPos();
-placeFab();
-initFabDrag();
 window.addEventListener('resize',()=>{const f=$('#fab');if(!f)return;const w=f.offsetWidth||54,h=f.offsetHeight||54;const x=Math.max(4,Math.min(fabPos.x,window.innerWidth-w-4));const y=Math.max(4,Math.min(fabPos.y,window.innerHeight-h-4));f.style.left=x+'px';f.style.top=y+'px';fabPos.x=x;fabPos.y=y;updateFabMenuAnchor();});
 /* 横屏布局：用 JS 检测旋转并切换 html.land 类，避免 iOS/部分浏览器不触发 orientation 媒体查询导致手机旋转后不进入横版 */
 function applyLandscape(){
@@ -2880,10 +3132,13 @@ function applyLandscape(){
 window.addEventListener('resize',applyLandscape);
 window.addEventListener('orientationchange',()=>setTimeout(applyLandscape,80));
 applyLandscape();
-/* 任务闹钟 / 计时：每秒检测倒计时与定时，每 10 秒静默保存计时进度 */
-setInterval(alarmTick,1000);
-setInterval(()=>{let run=false;S.tasks.forEach(t=>{if(t.timer&&t.timer.running)run=true;});if(run)save();},10000);
-(function showSplash(){
+/* 应用锁：启动先展示锁屏，解锁后才初始化应用 */
+setupLockScreen();
+(function(){const sp=document.getElementById('splash');if(sp)sp.classList.add('hidden-init');})();
+/* PWA：注册 Service Worker + 捕获安装提示 */
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){});});}
+function showSplash(){
+  const sp=document.getElementById('splash');if(sp){sp.classList.remove('hidden-init');sp.classList.remove('hide');}
   const now=new Date();
   const wd=['日','一','二','三','四','五','六'][now.getDay()];
   $('#splashDate').textContent=`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 · 星期${wd}`;
@@ -2892,9 +3147,7 @@ setInterval(()=>{let run=false;S.tasks.forEach(t=>{if(t.timer&&t.timer.running)r
   $('#splashMsg').textContent=splashEncourage(now.getHours());
   const ic=$('#splashIc');if(ic)ic.innerHTML=appLogoHTML();
   setTimeout(()=>{const s=$('#splash');if(s)s.classList.add('hide');},2200);
-})();
-/* PWA：注册 Service Worker + 捕获安装提示 */
-if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){});});}
+}
 function splashEncourage(h){
   if(h<6) return '夜深了，照顾好自己，早点休息 🌙';
   if(h<11) return ['早安，今天的你依然闪闪发光 ✨','新的一天，慢慢来，会很好的 🌿','早上好呀，喝杯温水再开工 💧'][h%3];
