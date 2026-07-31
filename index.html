@@ -1344,15 +1344,16 @@ function taskItem(t){
   </div>`;
 }
 function overviewItem(t){
-  const active=taskActive(t),ended=!!t.endedDate;
+  const vd=(ovDate&&ovDate!==today())?ovDate:today();
+  const active=taskActive(t,vd),ended=!!t.endedDate,done=isDone(t.id,vd);
   const status=ended?`<span class="chip coral">已终止</span>`
-    :active?`<span class="chip aqua">今日待打卡</span>`
+    :active?(done?`<span class="chip" style="background:var(--grass);color:#2e7d32">${vd===today()?'今日已打卡':'当日已打卡'}</span>`:`<span class="chip aqua">今日待打卡</span>`)
     :(t.type==='temp'?'<span class="sub">仅当日生效</span>':'<span class="sub">今日未排</span>');
   return `
   <div class="bill">
-    <div class="bill-ic" style="background:${t.type==='repeat'?'var(--grass)':'#fdeeed'}">${t.type==='repeat'?'🔁':'📌'}</div>
+    ${active?`<div class="ckbox ${done?'done':''}" onclick="toggleTaskOn('${t.id}','${vd}')">${done?'✓':''}</div>`:`<div class="bill-ic" style="background:${t.type==='repeat'?'var(--grass)':'#fdeeed'}">${t.type==='repeat'?'🔁':'📌'}</div>`}
     <div class="grow">
-      <div style="font-size:14.5px;font-weight:500">${esc(t.title)}</div>
+      <div style="font-size:14.5px;font-weight:500;${done?'text-decoration:line-through;opacity:.55':''}">${esc(t.title)}</div>
       <div class="t-meta">
         ${t.type==='repeat'?`<span class="chip">${repeatLabel(t)}</span>`:`<span class="chip coral">当日临时</span>`}
         ${status}
