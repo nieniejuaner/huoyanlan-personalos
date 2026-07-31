@@ -834,6 +834,13 @@ function cloudHasContent(){
          (s.insights&&s.insights.length)||(s.chat&&s.chat.length)||
          (s.profile&&(s.profile.nickname||s.profile.motto||s.profile.saveGoal));
 }
+function cloudObjRich(o){
+  if(!o||typeof o!=='object')return false;
+  return (o.incomes&&o.incomes.length)||(o.expenses&&o.expenses.length)||(o.gifts&&o.gifts.length)||
+         (o.tasks&&o.tasks.length)||(o.shifts&&o.shifts.length)||(o.notes&&o.notes.length)||
+         (o.insights&&o.insights.length)||(o.chat&&o.chat.length)||
+         (o.profile&&(o.profile.nickname||o.profile.motto||o.profile.saveGoal));
+}
 function scheduleSync(){
   if(!cloudState.on)return;
   if(_syncTimer)clearTimeout(_syncTimer);
@@ -861,6 +868,11 @@ async function ghPut(content,sha){
 }
 async function cloudPush(){
   if(!ghConnected())return;
+  // 安全保护：本机无实质数据时，若云端有内容则以云端为准，避免上传空数据覆盖云端备份
+  if(!cloudHasContent()){
+    const g=await ghGet();
+    if(g.ok&&g.raw){ try{ const o=JSON.parse(g.raw); if(cloudObjRich(o)){ await cloudApply(o); cloudSetStatus('ok','本机无数据，已保留云端'); return; } }catch(e){} }
+  }
   S._ts=Date.now();
   const payload=S;
   const enc=payload;
@@ -887,7 +899,7 @@ async function cloudApply(obj){
   if(cur==='me')refreshCloudCard();else render();
   toast('已从云端恢复');
 }
-async function cloudPull(){
+async function cloudPull(force){
   if(!ghConnected()){cloudSetStatus('off','未连接');return false;}
   cloudSetStatus('syncing');
   try{
@@ -898,7 +910,7 @@ async function cloudPull(){
     try{ obj=JSON.parse(g.raw); }
     catch(e){ cloudSetStatus('error','云端数据解析失败'); return false; }
     const ct=obj._ts||0;
-    if(!S._ts||ct>S._ts){
+    if(force||!S._ts||ct>S._ts){
       await cloudApply(obj);
       cloudState.last=Date.now();cloudSetStatus('ok','已从云端恢复 · '+fmtClock(cloudState.last));
       return true;
@@ -1021,7 +1033,7 @@ function cloudDisconnect(){
   toast('已断开云同步（本机数据保留）');refreshCloudCard();
 }
 function cloudPushNow(){cloudPush();toast('正在上传');}
-function cloudPullNow(){cloudPull();toast('正在恢复');}
+function cloudPullNow(){cloudPull(true);toast('正在恢复');}
 
 /* ================= 工具 ================= */
 const $=s=>document.querySelector(s);
