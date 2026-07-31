@@ -472,7 +472,7 @@ async function lockSetup(pw){
     const data=_migratePlain||JSON.parse(JSON.stringify(DEF));
     await lockStore(data);_migratePlain=null;
     toast('密码已设置 🔒');
-    if(ghConnected())lockPushCloud();
+    if(ghCredReady())lockPushCloud();
     afterUnlock();
   }catch(e){toast('设置失败：'+e.message);}
 }
@@ -513,7 +513,7 @@ async function setLockPassword(newPw){
   else{_sessXor=hashStr(newPw+'huoyanlan');rec={v:2,kind:'xor',salt:'huoyanlan',check:hashStr(newPw+'huoyanlan')};}
   localStorage.setItem(LOCK_KEY,JSON.stringify(rec));
   await lockStore(S);
-  if(ghConnected())lockPushCloud();
+  if(ghCredReady())lockPushCloud();
   toast('密码已更新 🔒');
 }
 function afterUnlock(){
@@ -551,7 +551,7 @@ function lockScreenHTML(){
     </div>`;
   }
   _migratePlain=probePlain();
-  const cloudHint=ghConnected()
+  const cloudHint=ghCredReady()
     ? '<div class="lock-hint" style="color:#3aa79f">✅ 已连接云同步，设置后将在你所有设备/浏览器共享同一把密码。</div>'
     : '<div class="lock-hint">⚠️ 当前未连接云同步，密码仅存于本机。建议先到「我的 → 云同步」连接，以确保多端同一密码。</div>';
   return `<div class="lock-card">
@@ -599,7 +599,7 @@ function lockForget(){
 function doLockForget(){
   if((document.getElementById('forgetConfirm').value||'').trim()!=='清除'){toast('请输入「清除」确认');return;}
   localStorage.removeItem(LOCK_KEY);localStorage.removeItem(KEY);
-  if(ghConnected()){lockCloudDelete();}
+  if(ghCredReady()){lockCloudDelete();}
   closeModal();setupLockScreen();
   toast('已清除，请重新设置密码');
 }
@@ -639,20 +639,20 @@ async function ghLockDelete(){
   await fetch(url,{method:'DELETE',headers:ghHeaders(),body:JSON.stringify({message:'remove lock',sha:g.sha})});
 }
 async function lockPushCloud(){
-  if(!ghConnected())return;
+  if(!ghCredReady())return;
   const rec=JSON.parse(localStorage.getItem(LOCK_KEY)||'null');if(!rec)return;
   try{const g=await ghLockGet();if(g.ok){await ghLockPut(rec,g.sha||null);_lockCloudSha=g.sha;}}catch(e){}
 }
 async function lockInit(){
-  // 决定权威锁记录：云端优先（保证多端同一把密码）；离线/未连接则退本机
+  // 决定权威锁记录：云端优先（保证多端同一把密码）；本机已配云凭证即尝试读取/写入云端锁
   _lockCloudErr=false;
-  if(ghConnected()){
+  if(ghCredReady()){
     try{
       const g=await ghLockGet();
       if(g.ok&&g.raw){localStorage.setItem(LOCK_KEY,g.raw);_lockGlobal=true;_lockCloudSha=g.sha;}
-      else if(g.ok&&!g.raw){_lockGlobal=false;if(localStorage.getItem(LOCK_KEY)){await lockPushCloud();}}
-      else{_lockGlobal=false;_lockCloudErr=true;}
-    }catch(e){_lockGlobal=false;_lockCloudErr=true;}
+      else if(g.ok&&!g.raw){if(localStorage.getItem(LOCK_KEY)){await lockPushCloud();_lockGlobal=!!localStorage.getItem(LOCK_KEY);}else{_lockGlobal=false;}}
+      else{_lockGlobal=false;_lockCloudErr=false;} // 云端不可达（含凭证失效）时降级本机锁，避免卡死
+    }catch(e){_lockGlobal=false;_lockCloudErr=false;}
   }else{_lockGlobal=false;}
 }
 function lockSetupPrompt(){
@@ -753,6 +753,7 @@ function ghCfg(){
   };
 }
 function ghConnected(){const c=ghCfg();return cloudState.on&&!!c.token&&!!c.repo;}
+function ghCredReady(){const c=ghCfg();return !!(c.token&&c.repo);} // 仅判断本机是否已配置云凭证（不依赖 cloudState.on，启动早期即可用）
 function ghRepoParts(){
   const c=ghCfg();const i=c.repo.indexOf('/');
   return {owner:c.repo.slice(0,i),name:c.repo.slice(i+1),path:c.path,branch:c.branch};
@@ -897,10 +898,10 @@ function refreshCloudCard(){
   }
 }
 async function initCloud(){
-  cloudState.on=localStorage.getItem(CLOUD_ON_KEY)==='1';
-  if(cloudState.on && !ghCfg().token){ // 旧 jsonblob 迁移：有开启标记但无 GitHub 配置 → 视为未连接，避免进入空配置“已连接”态
-    cloudState.on=false;localStorage.setItem(CLOUD_ON_KEY,'0');
-  }
+  // 已配置 GitHub 凭证即视为可同步（除非用户显式断开）；修复：此前依赖 CLOUD_ON_KEY==='1'，导致配了 token 也不自动同步
+  const cred=ghCredReady();
+  const explicitlyOff=localStorage.getItem(CLOUD_ON_KEY)==='0';
+  cloudState.on=cred&&!explicitlyOff;
   if(!cloudState.on){cloudSetStatus('off','未连接');return;}
   await cloudPull();
   if(cloudHasContent()){cloudPush();}
@@ -2671,7 +2672,7 @@ function pageMe(){
 
     ${locked?`
     <div class="card">
-      <div class="card-title">🔒 应用锁 ${_lockGlobal?'<span class="chip aqua" style="margin-left:6px">全局</span>':(ghConnected()?'<span class="chip" style="margin-left:6px">云端未同步</span>':'<span class="chip coral" style="margin-left:6px">仅本机</span>')}</div>
+      <div class="card-title">🔒 应用锁 ${_lockGlobal?'<span class="chip aqua" style="margin-left:6px">全局</span>':(ghCredReady()?'<span class="chip" style="margin-left:6px">云端未同步</span>':'<span class="chip coral" style="margin-left:6px">仅本机</span>')}</div>
       <div class="set-row" onclick="changeLockPw()" style="cursor:pointer"><span>🔑 修改密码</span><span class="sub">›</span></div>
       <div class="set-row" onclick="lockNow()" style="cursor:pointer"><span>🚪 立即锁定</span><span class="sub">›</span></div>
       <div class="sub mt8" style="font-size:11px;line-height:1.6">${_lockGlobal?'🔒 全局锁已开启：你所有设备/浏览器打开都需输入同一把密码。':'数据在本机与云端均以加密形式存储。'}忘记密码将<b style="color:#e0908b">无法恢复</b>。</div>
