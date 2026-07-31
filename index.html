@@ -40,7 +40,7 @@
   --hard:color-mix(in srgb, var(--coral) 55%, #ffffff);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
+html,body{height:100%;overflow-x:hidden}
 body{font-family:"SF Pro","SF Pro Text",system-ui,-apple-system,"PingFang SC","Helvetica Neue",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
 #app{max-width:560px;margin:0 auto;min-height:100vh;position:relative}
 @media(min-width:900px){#app{max-width:680px}}
@@ -178,6 +178,8 @@ textarea{resize:none;min-height:72px}
 .toast.show{opacity:1;transform:translateX(-50%)}
 /* 设置行 */
 .set-row{display:flex;align-items:center;justify-content:space-between;padding:13px 2px;border-bottom:1px solid var(--line);font-size:14.5px}
+.font-ctl{display:flex;align-items:center;gap:10px;margin:6px 0 2px}
+.font-ctl input[type=range]{flex:1;accent-color:var(--coral);height:26px}
 .set-row:last-child{border-bottom:none}
 .switch{width:46px;height:27px;border-radius:99px;background:#e7e0de;position:relative;transition:background .2s}
 .theme-grid{display:flex;flex-wrap:wrap;gap:14px 12px}
@@ -256,7 +258,11 @@ html.land{
   .tabbar{position:static;order:-1;left:auto;right:auto;top:auto;bottom:auto;transform:none;width:96px;max-width:none;flex-direction:column;justify-content:flex-start;border-top:none;border-right:1px solid var(--line);border-radius:0;padding:18px 0;background:var(--card)}
   .tab-item{justify-content:center;gap:5px;padding:16px 4px;font-size:9.5px}
   .tab-item .ic{font-size:23px}
-  #pages{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:22px 26px;max-width:1180px;margin:0 auto}
+  #pages{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:22px 26px;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+  #pages>.back-bar{grid-column:1/-1}
+  #pages>.page-anim{display:contents}
+  #pages .row,#pages .seg,#pages .h1,#pages .cal-head,#pages .chips-row,#pages .cal-legend,#pages .card-title{grid-column:1/-1}
+  #pages .card{margin-bottom:0}
   .fab{bottom:20px;right:20px}
   .fab-menu{bottom:90px;right:20px}
 }
@@ -754,6 +760,13 @@ function setTheme(i){
   localStorage.setItem(THEME_KEY,String(i));applyTheme(i);render();
   toast('已切换为「'+THEMES[i].name+'」主题');
 }
+
+/* ================= 字体大小（整体缩放，持久保存） ================= */
+const FS_KEY='huoyanlan_fs_v1';
+function curFont(){const v=parseFloat(localStorage.getItem(FS_KEY));return (v>=0.7&&v<=2)?v:1;}
+function applyFont(){document.documentElement.style.zoom=String(curFont());const v=document.getElementById('fontVal');if(v)v.textContent=Math.round(curFont()*100)+'%';}
+function setFont(v){v=Math.max(0.7,Math.min(1.8,v));localStorage.setItem(FS_KEY,String(v));applyFont();}
+function changeFont(d){setFont(Math.round((curFont()+d)*100)/100);}
 
 /* ================= 云同步（GitHub 私有仓库 · 你的云盘） ================= */
 const GH_API='https://api.github.com';
@@ -2745,6 +2758,13 @@ function pageMe(){
           <div class="theme-name">${esc(t.name)}</div>
         </div>`).join('')}
       </div>
+      <div class="f-label" style="margin:16px 0 4px">🔠 字体大小（横屏/竖屏通用，全局生效）</div>
+      <div class="font-ctl">
+        <button class="btn btn-ghost btn-sm" onclick="changeFont(-0.1)">A−</button>
+        <input type="range" min="0.7" max="1.8" step="0.05" value="${curFont()}" oninput="setFont(parseFloat(this.value))">
+        <button class="btn btn-ghost btn-sm" onclick="changeFont(0.1)">A＋</button>
+        <span id="fontVal" class="sub" style="min-width:40px;text-align:right">${Math.round(curFont()*100)}%</span>
+      </div>
       <div class="set-row"><span>🏦 存钱目标提醒</span><div class="switch ${st.remindSave?'on':''}" onclick="toggleSet('remindSave')"><i></i></div></div>
       <div class="set-row"><span>🎁 人情份子到期提醒</span><div class="switch ${st.remindGift?'on':''}" onclick="toggleSet('remindGift')"><i></i></div></div>
       <div class="set-row"><span>✅ 每日打卡提醒</span><div class="switch ${st.remindTask?'on':''}" onclick="toggleSet('remindTask')"><i></i></div></div>
@@ -3317,6 +3337,7 @@ function applyLandscape(){
 window.addEventListener('resize',applyLandscape);
 window.addEventListener('orientationchange',()=>setTimeout(applyLandscape,80));
 applyLandscape();
+applyFont();
 /* 应用锁：先拉取云端锁记录（决定全局/本地），再展示锁屏；解锁后才初始化应用 */
 (function(){const ls=document.getElementById('lockScreen');if(ls){ls.style.display='flex';ls.innerHTML='<div class="lock-card" style="text-align:center"><div class="lock-logo">🌺</div><div class="lock-sub">正在验证访问密码…</div></div>';}})();
 lockInit().then(setupLockScreen).catch(()=>setupLockScreen());
