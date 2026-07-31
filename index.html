@@ -258,11 +258,11 @@ html.land{
   .tabbar{position:static;order:-1;left:auto;right:auto;top:auto;bottom:auto;transform:none;width:96px;max-width:none;flex-direction:column;justify-content:flex-start;border-top:none;border-right:1px solid var(--line);border-radius:0;padding:18px 0;background:var(--card);transition:width .2s}
   .tab-item{justify-content:center;gap:5px;padding:16px 4px;font-size:9.5px}
   .tab-item .ic{font-size:23px}
-  #pages{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:22px 26px;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
+  #pages{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:22px 26px;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:stretch}
   #pages>.back-bar{grid-column:1/-1}
   #pages>.page-anim{display:contents}
   #pages .row,#pages .seg,#pages .h1,#pages .cal-head,#pages .chips-row,#pages .cal-legend,#pages .card-title{grid-column:1/-1}
-  #pages .card{margin-bottom:0}
+  #pages .card{margin-bottom:0;height:100%;border-width:2px}
   .fab{bottom:20px;right:20px}
   .fab-menu{bottom:90px;right:20px}
   #navToggle{display:flex;position:fixed;top:12px;left:12px;z-index:75;width:40px;height:40px;border-radius:12px;align-items:center;justify-content:center;font-size:21px;cursor:pointer;background:var(--card);border:2px solid var(--line);box-shadow:3px 3px 0 var(--hard);color:var(--ink)}
