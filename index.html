@@ -376,7 +376,7 @@ html.land{
 <div id="modalRoot"></div>
 <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="onAvatarPicked(this)">
 <div id="toast" class="toast"></div>
-<div id="lockScreen" class="lock-screen" style="display:none"></div>
+<!-- 应用锁界面已移除 -->
 <script>
 /* ================= 数据层（本地存储，隐私优先） ================= */
 const KEY='huoyanlan_personalos_v1';
@@ -409,7 +409,7 @@ const shiftColor=t=>{const f=SHIFT_TYPES.find(x=>x.key===t);return f?f.color:'#e
 let S=null;
 function mergeDef(d){const s=Object.assign(JSON.parse(JSON.stringify(DEF)),d||{});(s.shifts||[]).forEach(sh=>{if(sh.sdate===undefined){sh.sdate=sh.date||'';sh.stime=sh.start||'';sh.edate=sh.date||sh.sdate;sh.etime=sh.end||'';}});return s;}
 function load(){try{const r=localStorage.getItem(KEY);if(r){const d=JSON.parse(r);return mergeDef(d);}}catch(e){}return mergeDef({});}
-async function save(){if(!S)return;S._ts=S._ts||Date.now();if(!_sessKey&&!_sessXor){localStorage.setItem(KEY,JSON.stringify(S));scheduleSync();return;}try{await lockStore(S);}catch(e){console.warn('save',e);}scheduleSync();}
+async function save(){if(!S)return;S._ts=S._ts||Date.now();localStorage.setItem(KEY,JSON.stringify(S));scheduleSync();}
 function commit(){save();render();}
 
 /* ================= 应用锁（访问密码 · 本地加密） ================= */
@@ -575,7 +575,6 @@ function lockScreenHTML(){
     <div class="lock-hint">⚠️ 忘记密码将无法恢复数据，请牢记；建议先到「我的 → 数据管理」导出备份。</div>
   </div>`;
 }
-function lockRetry(){lockInit().then(setupLockScreen).catch(()=>setupLockScreen());}
 function setupLockScreen(){
   const ls=document.getElementById('lockScreen');if(!ls)return;
   if(_lockSkip){ _booted=true; if(!S)S=load(); ls.style.display='none'; fullBoot(); return; }
@@ -851,10 +850,9 @@ async function ghPut(content,sha){
 }
 async function cloudPush(){
   if(!ghConnected())return;
-  if(!_sessKey&&!_sessXor)return; // 未解锁不推送
   S._ts=Date.now();
   const payload=S;
-  const enc=(_sessKey||_sessXor)?await lockEncrypt(payload):payload;
+  const enc=payload;
   const raw=JSON.stringify(enc);
   if(raw.length>900000){cloudSetStatus('error','数据过大（含图片可能超 1MB），请先「清除缓存图片」');return;}
   cloudSetStatus('syncing');
@@ -862,8 +860,8 @@ async function cloudPush(){
     const g=await ghGet();
     if(!g.ok){cloudSetStatus('error',g.err);return;}
     let remoteTs=0;
-    if(g.raw){try{const rec=JSON.parse(g.raw);const obj=await lockDecrypt(rec).catch(()=>JSON.parse(g.raw));remoteTs=obj._ts||0;}catch(e){try{const obj=JSON.parse(g.raw);remoteTs=obj._ts||0;}catch(e2){}}}
-    if(remoteTs>(payload._ts||0)){cloudSetStatus('ok','云端已有更新，已保留');try{const rec=JSON.parse(g.raw);const obj=await lockDecrypt(rec).catch(()=>JSON.parse(g.raw));await cloudApply(obj);}catch(e){}return;}
+    if(g.raw){try{const obj=JSON.parse(g.raw);remoteTs=obj._ts||0;}catch(e){}}
+    if(remoteTs>(payload._ts||0)){cloudSetStatus('ok','云端已有更新，已保留');try{const obj=JSON.parse(g.raw);await cloudApply(obj);}catch(e){}return;}
     const res=await ghPut(ghB64encode(raw),g.sha);
     if(res.ok){cloudState.last=Date.now();cloudSetStatus('ok','已同步 · '+fmtClock(cloudState.last));}
     else if(res.status===401){cloudSetStatus('error','令牌无效（401）');}
@@ -886,14 +884,8 @@ async function cloudPull(){
     if(!g.ok){cloudSetStatus('error',g.err);return false;}
     if(!g.raw){cloudSetStatus('ok','云端暂无数据');return false;}
     let obj;
-    try{ obj=await lockDecrypt(JSON.parse(g.raw)); }
-    catch(e){
-      // 云端数据已加密（来自其他已上锁设备）：要求输入密码解密后恢复，并在本机建立锁
-      const pw=await promptCloudPassword();
-      if(!pw){cloudSetStatus('ok','已取消恢复');return false;}
-      try{ obj=await decryptCloudWithPw(JSON.parse(g.raw),pw); }
-      catch(e2){ cloudSetStatus('error','密码错误，无法解密云端数据'); return false; }
-    }
+    try{ obj=JSON.parse(g.raw); }
+    catch(e){ cloudSetStatus('error','云端数据解析失败'); return false; }
     const ct=obj._ts||0;
     if(!S._ts||ct>S._ts){
       await cloudApply(obj);
@@ -2788,18 +2780,6 @@ function pageMe(){
       <div class="set-row" onclick="resetData()" style="cursor:pointer;color:#e0908b"><span>⚠️ 重置数据</span><span class="sub">›</span></div>
     </div>
 
-    ${locked?`
-    <div class="card">
-      <div class="card-title">🔒 应用锁 ${_lockGlobal?'<span class="chip aqua" style="margin-left:6px">全局</span>':(ghCredReady()?'<span class="chip" style="margin-left:6px">云端未同步</span>':'<span class="chip coral" style="margin-left:6px">仅本机</span>')}</div>
-      <div class="set-row" onclick="changeLockPw()" style="cursor:pointer"><span>🔑 修改密码</span><span class="sub">›</span></div>
-      <div class="set-row" onclick="lockNow()" style="cursor:pointer"><span>🚪 立即锁定</span><span class="sub">›</span></div>
-      <div class="sub mt8" style="font-size:11px;line-height:1.6">${_lockGlobal?'🔒 全局锁已开启：你所有设备/浏览器打开都需输入同一把密码。':'数据在本机与云端均以加密形式存储。'}忘记密码将<b style="color:#e0908b">无法恢复</b>。</div>
-    </div>`:`
-    <div class="card">
-      <div class="card-title">🔒 应用锁</div>
-      <div class="set-row" onclick="lockSetupPrompt()" style="cursor:pointer"><span>🔒 开启访问密码</span><span class="sub">设置 ›</span></div>
-      <div class="sub mt8" style="font-size:11px;line-height:1.6">开启后每次打开需输入密码，数据以加密形式存储。</div>
-    </div>`}
 
     <div class="card">
       <div class="card-title"><span>☁️ 云同步</span><span id="cloudStatusTxt" class="sub"></span></div>
@@ -3376,9 +3356,10 @@ _navT.title='收起 / 展开侧栏';
 _navT.onclick=()=>document.documentElement.classList.toggle('nav-collapsed');
 document.body.appendChild(_navT);
 
-/* 应用锁：先拉取云端锁记录（决定全局/本地），再展示锁屏；解锁后才初始化应用 */
-(function(){const ls=document.getElementById('lockScreen');if(ls){ls.style.display='flex';ls.innerHTML='<div class="lock-card" style="text-align:center"><div class="lock-logo">🌺</div><div class="lock-sub">正在验证访问密码…</div></div>';}})();
-lockInit().then(setupLockScreen).catch(()=>setupLockScreen());
+/* 已取消应用锁：直接启动应用；启动时从云端恢复数据 */
+if(!S)S=load();
+_booted=true;
+fullBoot();
 (function(){const sp=document.getElementById('splash');if(sp)sp.classList.add('hidden-init');})();
 /* PWA：注册 Service Worker + 捕获安装提示 */
 if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('./sw.js').catch(function(){});});}
