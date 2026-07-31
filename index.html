@@ -255,7 +255,7 @@ textarea{resize:none;min-height:72px}
 /* ============ 横屏 / 宽屏：左侧索引栏 ============ */
 html.land{
   #app{display:flex;max-width:none;margin:0;height:100dvh;overflow:hidden}
-  .tabbar{position:static;order:-1;left:auto;right:auto;top:auto;bottom:auto;transform:none;width:96px;max-width:none;flex-direction:column;justify-content:flex-start;border-top:none;border-right:1px solid var(--line);border-radius:0;padding:18px 0;background:var(--card)}
+  .tabbar{position:static;order:-1;left:auto;right:auto;top:auto;bottom:auto;transform:none;width:96px;max-width:none;flex-direction:column;justify-content:flex-start;border-top:none;border-right:1px solid var(--line);border-radius:0;padding:18px 0;background:var(--card);transition:width .2s}
   .tab-item{justify-content:center;gap:5px;padding:16px 4px;font-size:9.5px}
   .tab-item .ic{font-size:23px}
   #pages{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:22px 26px;max-width:1180px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start}
@@ -265,7 +265,10 @@ html.land{
   #pages .card{margin-bottom:0}
   .fab{bottom:20px;right:20px}
   .fab-menu{bottom:90px;right:20px}
+  #navToggle{display:flex;position:fixed;top:12px;left:12px;z-index:75;width:40px;height:40px;border-radius:12px;align-items:center;justify-content:center;font-size:21px;cursor:pointer;background:var(--card);border:2px solid var(--line);box-shadow:3px 3px 0 var(--hard);color:var(--ink)}
 }
+html:not(.land) #navToggle{display:none}
+html.land.nav-collapsed .tabbar{width:0;padding-left:0;padding-right:0;overflow:hidden;border-right:none}
 /* ===== 贴纸手账风（选定视觉） ===== */
 .card{border:2.5px solid var(--outline);border-radius:20px;box-shadow:4px 4px 0 var(--hard)}
 .btn{border:2.5px solid var(--outline);box-shadow:3px 3px 0 var(--hard)}
@@ -1087,6 +1090,7 @@ const TABS=[
   {id:'study',ic:'✅',name:'任务'},
   {id:'money',ic:'💰',name:'账目'},
   {id:'shift',ic:'📅',name:'排班'},
+  {id:'gift',ic:'🧧',name:'份子钱'},
   {id:'me',ic:'👤',name:'我的'}
 ];
 let cur='home';
@@ -3190,6 +3194,32 @@ function saveExpense(){
   });
 }
 
+/* ================= 份子钱台账（独立板块） ================= */
+function pageGift(){
+  const gifts=S.gifts.slice().sort((a,x)=>x.ts-a.ts);
+  return `
+  <div class="page-anim">
+    <div class="row" style="margin:4px 2px 14px">
+      <div class="h1 grow">🧧 份子钱台账</div>
+      <button class="btn btn-grass btn-sm" style="padding:8px 14px" onclick="openGiftModal()">＋ 新增记录</button>
+    </div>
+    <div class="card">
+      <div class="card-title">🎁 份子钱专项台账 <span class="sub" style="font-weight:400">送出从存钱账户扣减</span></div>
+      <div class="seg" style="margin-bottom:6px">
+        <button class="${giftTab==='in'?'on':''}" style="${giftTab==='in'?'color:#1f5b57':''}" onclick="giftTab='in';render()">收到份子钱</button>
+        <button class="${giftTab==='out'?'on':''}" style="${giftTab==='out'?'color:#c98d88':''}" onclick="giftTab='out';render()">送出份子钱</button>
+        <button class="${giftTab==='all'?'on':''}" onclick="giftTab='all';render()">全部往来</button>
+      </div>
+      <input placeholder="🔍 按姓名 / 事件筛选人情往来" value="${esc(giftQuery)}" style="margin:8px 0" oninput="filterGift(this.value)">
+      <div id="giftList">
+      ${gifts.length?gifts.map(giftRow).join(''):`<div class="empty">暂无${giftTab==='all'?'往来':(giftTab==='in'?'收到':'送出')}记录</div>`}
+      </div>
+      <div id="giftSummary">${giftSummaryHTML()}</div>
+      <button class="btn btn-grass btn-block mt8" onclick="openGiftModal()">＋ 新增份子记录</button>
+    </div>
+  </div>`;
+}
+
 /* ================= 份子钱 ================= */
 function openGiftModal(){
   openModal(`<h3>🎁 新增份子记录 <button class="x" onclick="closeModal()">✕</button></h3>
@@ -3316,7 +3346,7 @@ function pushChat(q){
 }
 
 /* ================= 渲染入口 ================= */
-const PAGES={home:pageHome,hub:pageHub,study:pageStudy,money:pageMoney,shift:pageShift,me:pageMe,acct:pageAcct};
+const PAGES={home:pageHome,hub:pageHub,study:pageStudy,money:pageMoney,shift:pageShift,gift:pageGift,me:pageMe,acct:pageAcct};
 function render(){
   let html=navHistory.length>0?`<div class="back-bar" onclick="goback()"><span class="bk">‹</span>返回</div>`:'';
   html+=PAGES[cur]();
@@ -3338,6 +3368,14 @@ window.addEventListener('resize',applyLandscape);
 window.addEventListener('orientationchange',()=>setTimeout(applyLandscape,80));
 applyLandscape();
 applyFont();
+/* 横屏导航可折叠 */
+const _navT=document.createElement('button');
+_navT.id='navToggle';
+_navT.innerHTML='☰';
+_navT.title='收起 / 展开侧栏';
+_navT.onclick=()=>document.documentElement.classList.toggle('nav-collapsed');
+document.body.appendChild(_navT);
+
 /* 应用锁：先拉取云端锁记录（决定全局/本地），再展示锁屏；解锁后才初始化应用 */
 (function(){const ls=document.getElementById('lockScreen');if(ls){ls.style.display='flex';ls.innerHTML='<div class="lock-card" style="text-align:center"><div class="lock-logo">🌺</div><div class="lock-sub">正在验证访问密码…</div></div>';}})();
 lockInit().then(setupLockScreen).catch(()=>setupLockScreen());
