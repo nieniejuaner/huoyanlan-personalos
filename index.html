@@ -612,7 +612,7 @@ function lockNow(){
 }
 function lockForget(){
   openModal(`<h3>⚠️ 忘记密码 <button class="x" onclick="closeModal()">✕</button></h3>
-    <p style="font-size:14px;color:var(--sub)">清除密码会<b style="color:#e0908b">同时删除本机所有加密数据</b>（无法恢复）。云端加密备份需你自行在 GitHub 删除。请输入「清除」确认。</p>
+    <p style="font-size:calc(14px * var(--fs));color:var(--sub)">清除密码会<b style="color:#e0908b">同时删除本机所有加密数据</b>（无法恢复）。云端加密备份需你自行在 GitHub 删除。请输入「清除」确认。</p>
     <input id="forgetConfirm" placeholder="清除">
     <div class="grid2 mt16"><button class="btn btn-ghost" onclick="closeModal()">取消</button><button class="btn btn-coral" onclick="doLockForget()">确认清除</button></div>`);
 }
@@ -685,7 +685,7 @@ async function lockInit(){
 }
 function lockSetupPrompt(){
   openModal(`<h3>🔒 设置访问密码 <button class="x" onclick="closeModal()">✕</button></h3>
-    <p class="sub" style="font-size:13px">开启后每次打开需输入密码，数据将以加密形式存储。</p>
+    <p class="sub" style="font-size:calc(13px * var(--fs))">开启后每次打开需输入密码，数据将以加密形式存储。</p>
     <div class="f-label">设置密码（至少 4 位）</div>
     <input id="sp1" type="password" placeholder="密码">
     <div class="f-label mt8">再次输入</div>
@@ -944,7 +944,7 @@ function promptCloudPassword(){
   return new Promise(resolve=>{
     window.__pwresolve=resolve;
     openModal(`<h3>🔓 解密并恢复云端数据 <button class="x" onclick="closeModal();__pwCancel()">✕</button></h3>
-      <p class="sub" style="font-size:13px">云端数据已加密，请输入你的访问密码以解密并恢复到本机。</p>
+      <p class="sub" style="font-size:calc(13px * var(--fs))">云端数据已加密，请输入你的访问密码以解密并恢复到本机。</p>
       <input id="cpw" type="password" placeholder="访问密码" onkeydown="if(event.key==='Enter')__submitCpw()">
       <div class="lock-err" id="cpwErr"></div>
       <div class="grid2 mt16"><button class="btn btn-ghost" onclick="__pwCancel()">取消</button><button class="btn btn-coral" onclick="__submitCpw()">解密并恢复</button></div>`);
@@ -972,7 +972,7 @@ function refreshCloudCard(){
         <div style="flex:1;margin-left:8px"><div class="f-label">分支</div><input id="ghBranch" placeholder="main" value="${esc(c.branch)}"></div>
       </div>
       <button class="btn btn-aqua btn-block mt12" onclick="cloudConnect()">连接并上传本机数据</button>
-      <div class="sub mt8" style="font-size:11px;line-height:1.5">① GitHub → Settings → Developer settings → Personal access tokens → 生成（勾选 repo 范围）。② 新仓库请先在 GitHub 建好一个空的私有仓库。</div>`;
+      <div class="sub mt8" style="font-size:calc(11px * var(--fs));line-height:1.5">① GitHub → Settings → Developer settings → Personal access tokens → 生成（勾选 repo 范围）。② 新仓库请先在 GitHub 建好一个空的私有仓库。</div>`;
   }else{
     const c=ghCfg();
     const last=cloudState.last?('上次 '+fmtClock(cloudState.last)):'';
@@ -986,7 +986,7 @@ function refreshCloudCard(){
         <button class="btn btn-ghost btn-sm" onclick="cloudDisconnect()">断开连接</button>
         <span class="sub" style="margin-left:auto">${last}</span>
       </div>
-      <div class="sub mt8" style="font-size:11px;line-height:1.5">✅ 数据存于你自己的私有仓库、加密传输、永久保存。Token 仅保存在本机浏览器。文件含大量图片可能超过 1MB 限制，建议适时「清除缓存图片」。</div>`;
+      <div class="sub mt8" style="font-size:calc(11px * var(--fs));line-height:1.5">✅ 数据存于你自己的私有仓库、加密传输、永久保存。Token 仅保存在本机浏览器。文件含大量图片可能超过 1MB 限制，建议适时「清除缓存图片」。</div>`;
   }
 }
 async function initCloud(){
@@ -1307,7 +1307,7 @@ function pageHome(){
           <div class="h1">${greet()}${S.profile.nickname?'，'+esc(S.profile.nickname):''}</div>
           <div class="sub mt8">${d.getMonth()+1}月${d.getDate()}日 · 星期${WEEK[d.getDay()]}</div>
         </div>
-        <span style="font-size:30px">🌸🐶</span>
+        <span style="font-size:calc(30px * var(--fs))">🌸🐶</span>
       </div>
     </div>
 
@@ -1318,7 +1318,7 @@ function pageHome(){
         <div class="acct-box" style="background:var(--line)"><div class="a-left"><div class="a-name">🧾 日常支出</div></div><div class="a-right"><div class="a-val">¥${fmt(b.daily)}</div></div></div>
         <div class="acct-box" style="background:#fdeeed"><div class="a-left"><div class="a-name">✨ 为心情买单</div></div><div class="a-right"><div class="a-val">¥${fmt(b.mood)}</div></div></div>
       </div>
-      <div class="row mt12" style="justify-content:space-between;font-size:12.5px;color:var(--sub)">
+      <div class="row mt12" style="justify-content:space-between;font-size:calc(12.5px * var(--fs));color:var(--sub)">
         <span>今日 <b class="amt-in">+${fmt(f.inc)}</b> / <b class="amt-out">-${fmt(f.exp)}</b></span>
         <span>🎁 份子今日 ${g.gin||g.gout?`<b class="amt-in">+${fmt(g.gin)}</b> / <b class="amt-out">-${fmt(g.gout)}</b>`:'无变动'}</span>
       </div>
@@ -1329,11 +1329,11 @@ function pageHome(){
       <div class="grid2">
         <div style="background:var(--line);border-radius:14px;padding:12px">
           <div class="sub">🧾 日常花费</div>
-          <div style="font-size:19px;font-weight:700;margin-top:2px">¥${fmt(f.dailyExp)}</div>
+          <div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px">¥${fmt(f.dailyExp)}</div>
         </div>
         <div style="background:#fdeeed;border-radius:14px;padding:12px">
           <div class="sub">✨ 心情消费</div>
-          <div style="font-size:19px;font-weight:700;margin-top:2px;color:#e0908b">¥${fmt(f.moodExp)}</div>
+          <div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px;color:#e0908b">¥${fmt(f.moodExp)}</div>
         </div>
       </div>
     </div>
@@ -1350,8 +1350,8 @@ function pageHome(){
       <div class="card-title">今日任务快照 <button class="btn-sm" style="color:#c98d88" onclick="go('study')">去打卡 ›</button></div>
       ${tasks.length?`
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:14px">待完成 <b>${tasks.length-done}</b> 项 · 共 ${tasks.length} 项</span>
-        <span style="font-size:13px;font-weight:700;color:#3aa79f">${pct}%</span>
+        <span style="font-size:calc(14px * var(--fs))">待完成 <b>${tasks.length-done}</b> 项 · 共 ${tasks.length} 项</span>
+        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:#3aa79f">${pct}%</span>
       </div>
       <div class="progress"><i style="width:${pct}%"></i></div>`
       :`<div class="empty" style="padding:12px 0">今天还没有任务，点右下角＋添加</div>`}
@@ -1390,7 +1390,7 @@ function weekChart(){
     max=Math.max(max,dn);
     days.push({d,dn,wd:WEEK[new Date(d+'T00:00:00').getDay()]});
   }
-  html=days.map(x=>`<div class="bar-col"><span style="font-size:10px;color:#3aa79f;font-weight:700">${x.dn||''}</span><div class="bar" style="height:${x.dn/max*80}%"></div><span class="bar-lb">${x.d===t?'今':x.wd}</span></div>`).join('');
+  html=days.map(x=>`<div class="bar-col"><span style="font-size:calc(10px * var(--fs));color:#3aa79f;font-weight:700">${x.dn||''}</span><div class="bar" style="height:${x.dn/max*80}%"></div><span class="bar-lb">${x.d===t?'今':x.wd}</span></div>`).join('');
   return `<div class="bars">${html}</div>`;
 }
 function fundChart(){
@@ -1536,7 +1536,7 @@ function overviewItem(t){
   <div class="bill">
     ${active?`<div class="ckbox ${done?'done':''}" onclick="toggleTaskOn('${t.id}','${vd}')">${done?'✓':''}</div>`:`<div class="bill-ic" style="background:${t.type==='repeat'?'var(--grass)':'#fdeeed'}">${t.type==='repeat'?'🔁':'📌'}</div>`}
     <div class="grow">
-      <div style="font-size:14.5px;font-weight:500;${done?'text-decoration:line-through;opacity:.55':''}">${esc(t.title)}</div>
+      <div style="font-size:calc(14.5px * var(--fs));font-weight:500;${done?'text-decoration:line-through;opacity:.55':''}">${esc(t.title)}</div>
       <div class="t-meta">
         ${t.type==='repeat'?`<span class="chip">${repeatLabel(t)}</span>`:`<span class="chip coral">当日临时</span>`}
         ${status}
@@ -1604,8 +1604,8 @@ function studyToday(){
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:14px;font-weight:600">${doneN}/${total} 已完成</span>
-        <span style="font-size:13px;font-weight:700;color:#3aa79f">${pct}%</span>
+        <span style="font-size:calc(14px * var(--fs));font-weight:600">${doneN}/${total} 已完成</span>
+        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:#3aa79f">${pct}%</span>
       </div>
       <div class="progress"><i style="width:${pct}%"></i></div>
       <div class="seg mt12">
@@ -1641,7 +1641,7 @@ function ovDayItem(t,ds){
   <div class="bill" style="padding:8px">
     <div class="ckbox ${done?'done':''}" onclick="toggleTaskOn('${t.id}','${ds}')">${done?'✓':''}</div>
     <div class="grow">
-      <div style="font-size:14px;font-weight:500;${done?'text-decoration:line-through;opacity:.55':''}">${esc(t.title)}</div>
+      <div style="font-size:calc(14px * var(--fs));font-weight:500;${done?'text-decoration:line-through;opacity:.55':''}">${esc(t.title)}</div>
       <div class="t-meta">${t.type==='repeat'?`<span class="chip">🔁 ${repeatLabel(t)}</span>`:`<span class="chip coral">当日</span>`}</div>
     </div>
     <div class="ov-acts">
@@ -1673,7 +1673,7 @@ function ovCalCard(){
         return `
         <div class="cal-cell ${c.out?'out':''} ${c.ds===todayStr?'today':''} ${c.ds===sel?'sel':''}" onclick="ovSelDay('${c.ds}')">
           <div class="d">${c.d}</div>
-          ${ts.length?`<div style="margin-top:2px;text-align:center"><span style="display:inline-block;min-width:15px;padding:0 2px;border-radius:6px;font-size:8.5px;font-weight:700;background:${dn>=ts.length?'var(--grass)':'var(--aqua)'}">${dn}/${ts.length}</span></div>`:''}
+          ${ts.length?`<div style="margin-top:2px;text-align:center"><span style="display:inline-block;min-width:15px;padding:0 2px;border-radius:6px;font-size:calc(8.5px * var(--fs));font-weight:700;background:${dn>=ts.length?'var(--grass)':'var(--aqua)'}">${dn}/${ts.length}</span></div>`:''}
         </div>`;}).join('')}
     </div>
     <div class="sub" style="text-align:center;padding-top:6px">点选日期后可在该日添加任务</div>
@@ -1718,7 +1718,7 @@ function studyOverview(){
     </div>
     <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:14px;font-weight:600" id="ovCount">${ovCountText()}</span>
+        <span style="font-size:calc(14px * var(--fs));font-weight:600" id="ovCount">${ovCountText()}</span>
         <span class="sub">${ovDate?('📅 '+ovDate):'含已终止 · 可增删'}</span>
       </div>
       <div class="row" style="gap:8px;margin-bottom:8px">
@@ -1974,7 +1974,7 @@ function billRow(e){
     <input type="checkbox" class="g-sel" ${expSel[e.id]?'checked':''} onclick="event.stopPropagation();toggleExpSel('${e.id}')">
     <div class="bill-ic" style="${isMood?'background:#fdeeed':''}">${catIc(e.category)}</div>
     <div class="grow">
-      <div style="font-size:14.5px;font-weight:500">${esc(e.category)}${isMood?' <span class="chip coral">✨</span>':''}${e.img?' 🖼':''}</div>
+      <div style="font-size:calc(14.5px * var(--fs));font-weight:500">${esc(e.category)}${isMood?' <span class="chip coral">✨</span>':''}${e.img?' 🖼':''}</div>
       <div class="sub">${esc(e.date)}${e.note?' · '+esc(e.note):''}</div>
     </div>
     <div class="${isMood?'':'amt-out'}" style="${isMood?'color:#f1bfbc;font-weight:700':''}">-¥${fmt(e.amount)}</div>
@@ -1986,7 +1986,7 @@ function incomeRow(i){
     <input type="checkbox" class="g-sel" ${expSel[i.id]?'checked':''} onclick="event.stopPropagation();toggleExpSel('${i.id}')">
     <div class="bill-ic" style="background:var(--aqua)">${catIc(i.category)}</div>
     <div class="grow">
-      <div style="font-size:14.5px;font-weight:500">${esc(i.category)}${i.img?' 🖼':''}</div>
+      <div style="font-size:calc(14.5px * var(--fs));font-weight:500">${esc(i.category)}${i.img?' 🖼':''}</div>
       <div class="sub">${esc(i.date)}${i.note?' · '+esc(i.note):''}</div>
     </div>
     <div style="font-weight:700;color:#3aa79f">+¥${fmt(i.total)}</div>
@@ -2105,7 +2105,7 @@ function pageMoney(){
         <div class="acct-box" style="background:var(--line)" onclick="openAcct('daily')"><div class="a-left"><div class="a-name">🧾 日常支出</div><div class="a-tip">默认扣款 · 点按看历史</div></div><div class="a-right"><div class="a-val">¥${fmt(b.daily)}</div><div class="a-month">本月 ¥${fmt(mb.daily)}</div></div><span class="acct-go">›</span></div>
         <div class="acct-box" style="background:#fdeeed" onclick="openAcct('mood')"><div class="a-left"><div class="a-name">✨ 为心情买单</div><div class="a-tip">犒劳专属 · 点按看历史</div></div><div class="a-right"><div class="a-val">¥${fmt(b.mood)}</div><div class="a-month">本月 ¥${fmt(mb.mood)}</div></div><span class="acct-go">›</span></div>
       </div>
-      <div class="row mt12" style="justify-content:space-between;font-size:12.5px;color:var(--sub)">
+      <div class="row mt12" style="justify-content:space-between;font-size:calc(12.5px * var(--fs));color:var(--sub)">
         <span>今日收支 <b class="amt-in">+${fmt(f.inc)}</b> / <b class="amt-out">-${fmt(f.exp)}</b></span>
         <span>🎁 本月份子净差 <b style="color:${g.net>=0?'#3aa79f':'#e0908b'}">${g.net>=0?'+':''}${fmt(g.net)}</b></span>
       </div>
@@ -2125,7 +2125,7 @@ function pageMoney(){
       <div class="card-title">🏦 存钱明细 <span class="sub" style="font-weight:400">收入分配 + 收到份子钱</span></div>
       ${sd.length?sd.map(r=>`<div class="row" style="margin:7px 0;align-items:center">
         <div class="grow">
-          <div style="font-size:14px">${esc(r.label)}</div>
+          <div style="font-size:calc(14px * var(--fs))">${esc(r.label)}</div>
           <div class="sub">${esc(r.date)}</div>
         </div>
         <div style="font-weight:700;color:#3aa79f">+¥${fmt(r.amt)}</div>
@@ -2145,7 +2145,7 @@ function pageMoney(){
     <div class="card">
       <div class="card-title">账单核算 <span class="sub" style="font-weight:400">勾选 / 筛选 / 按月统计</span></div>
       <div class="row" style="gap:8px;margin:6px 0;align-items:center">
-        <input id="expMonth" type="month" value="${esc(expMonth)}" onchange="filterExpMonth(this.value)" style="flex:1;font-size:14px">
+        <input id="expMonth" type="month" value="${esc(expMonth)}" onchange="filterExpMonth(this.value)" style="flex:1;font-size:calc(14px * var(--fs))">
         ${expMonth?`<button class="btn-sm" onclick="filterExpMonth('')">全部月份</button>`:''}
       </div>
       <input placeholder="🔍 按分类 / 备注筛选（收入 / 支出）" value="${esc(expQuery)}" style="margin:6px 0" oninput="filterExp(this.value)">
@@ -2218,7 +2218,7 @@ function acctListHTML(acc){
       <input type="checkbox" class="a-sel" ${acctSel[r.id]?'checked':''} onclick="event.stopPropagation();acctToggle('${r.id}')">
       <div class="bill-ic" style="${r.amt<0?'background:#fdeeed':''}">${r.amt<0?'💸':'💰'}</div>
       <div class="grow">
-        <div style="font-size:14.5px;font-weight:500">${esc(r.cat||'—')}</div>
+        <div style="font-size:calc(14.5px * var(--fs));font-weight:500">${esc(r.cat||'—')}</div>
         <div class="sub">${esc(r.date)}${r.note?' · '+esc(r.note):''}</div>
       </div>
       <div style="font-weight:700;color:${r.amt>=0?'#3aa79f':'#e0908b'}">${r.amt>=0?'+':'-'}${fmt(Math.abs(r.amt))}</div>
@@ -2260,7 +2260,7 @@ function pageAcct(){
     <div class="card">
       <div class="card-title">筛选与导出</div>
       <div class="row" style="gap:8px;margin:6px 0">
-        <input id="acctMonth" type="month" value="${esc(acctMonth)}" onchange="acctFilterMonth(this.value)" style="flex:1;font-size:14px">
+        <input id="acctMonth" type="month" value="${esc(acctMonth)}" onchange="acctFilterMonth(this.value)" style="flex:1;font-size:calc(14px * var(--fs))">
         ${acctMonth?`<button class="btn-sm" onclick="acctFilterMonth('')">全部月份</button>`:''}
       </div>
       <input id="acctQuery" placeholder="🔍 按事件 / 分类 / 备注筛选" value="${esc(acctQuery)}" oninput="acctFilter(this.value)" style="margin:6px 0">
@@ -2283,9 +2283,9 @@ function giftLedgerBody(){
     <div class="card">
       <div class="card-title">本月人情 <span class="sub" style="font-weight:400">收 / 送 / 净差</span></div>
       <div class="row" style="justify-content:space-around;text-align:center;margin:8px 0 4px">
-        <div><div style="font-size:12px;color:var(--sub)">收到</div><div style="font-weight:700;color:#3aa79f;font-size:19px">+¥${fmt(g.gin)}</div></div>
-        <div><div style="font-size:12px;color:var(--sub)">送出</div><div style="font-weight:700;color:#f1bfbc;font-size:19px">-¥${fmt(g.gout)}</div></div>
-        <div><div style="font-size:12px;color:var(--sub)">净差</div><div style="font-weight:700;color:${g.net>=0?'#3aa79f':'#e0908b'};font-size:19px">${g.net>=0?'+':''}${fmt(g.net)}</div></div>
+        <div><div style="font-size:calc(12px * var(--fs));color:var(--sub)">收到</div><div style="font-weight:700;color:#3aa79f;font-size:calc(19px * var(--fs))">+¥${fmt(g.gin)}</div></div>
+        <div><div style="font-size:calc(12px * var(--fs));color:var(--sub)">送出</div><div style="font-weight:700;color:#f1bfbc;font-size:calc(19px * var(--fs))">-¥${fmt(g.gout)}</div></div>
+        <div><div style="font-size:calc(12px * var(--fs));color:var(--sub)">净差</div><div style="font-weight:700;color:${g.net>=0?'#3aa79f':'#e0908b'};font-size:calc(19px * var(--fs))">${g.net>=0?'+':''}${fmt(g.net)}</div></div>
       </div>
     </div>
     <div class="card">
@@ -2319,9 +2319,9 @@ function pageGift(){
     <div class="card">
       <div class="card-title">本月人情 <span class="sub" style="font-weight:400">收 / 送 / 净差</span></div>
       <div class="row" style="justify-content:space-around;text-align:center;margin:8px 0 4px">
-        <div><div style="font-size:12px;color:var(--sub)">收到</div><div style="font-weight:700;color:#3aa79f;font-size:19px">+¥${fmt(g.gin)}</div></div>
-        <div><div style="font-size:12px;color:var(--sub)">送出</div><div style="font-weight:700;color:#f1bfbc;font-size:19px">-¥${fmt(g.gout)}</div></div>
-        <div><div style="font-size:12px;color:var(--sub)">净差</div><div style="font-weight:700;color:${g.net>=0?'#3aa79f':'#e0908b'};font-size:19px">${g.net>=0?'+':''}${fmt(g.net)}</div></div>
+        <div><div style="font-size:calc(12px * var(--fs));color:var(--sub)">收到</div><div style="font-weight:700;color:#3aa79f;font-size:calc(19px * var(--fs))">+¥${fmt(g.gin)}</div></div>
+        <div><div style="font-size:calc(12px * var(--fs));color:var(--sub)">送出</div><div style="font-weight:700;color:#f1bfbc;font-size:calc(19px * var(--fs))">-¥${fmt(g.gout)}</div></div>
+        <div><div style="font-size:calc(12px * var(--fs));color:var(--sub)">净差</div><div style="font-weight:700;color:${g.net>=0?'#3aa79f':'#e0908b'};font-size:calc(19px * var(--fs))">${g.net>=0?'+':''}${fmt(g.net)}</div></div>
       </div>
     </div>
 
@@ -2357,7 +2357,7 @@ function giftRow(x){
     <input type="checkbox" class="g-sel" ${giftSel[x.id]?'checked':''} onclick="event.stopPropagation();toggleGiftSel('${x.id}')">
     <div class="bill-ic" style="background:${isIn?'var(--aqua)':'#fdeeed'}">${isIn?'🧧':'🎁'}</div>
     <div class="grow">
-      <div style="font-size:14.5px;font-weight:500">${esc(x.name)}${x.relation?` <span class="sub">(${esc(x.relation)})</span>`:''}${x.img?' 🖼':''}</div>
+      <div style="font-size:calc(14.5px * var(--fs));font-weight:500">${esc(x.name)}${x.relation?` <span class="sub">(${esc(x.relation)})</span>`:''}${x.img?' 🖼':''}</div>
       <div class="sub">${esc(x.date)} · ${esc(x.event)}${x.note?' · '+esc(x.note):''}</div>
     </div>
     <div style="font-weight:700;color:${isIn?'#3aa79f':'#f1bfbc'}">${isIn?'+':'-'}¥${fmt(x.amount)}</div>
@@ -2502,7 +2502,7 @@ function pageShift(){
         ${cells.map(c=>{const sh=shiftsForDate(c.ds);return `
           <div class="cal-cell ${c.out?'out':''} ${c.ds===todayStr?'today':''}" onclick="openDayShifts('${c.ds}')">
             <div class="d">${c.d}</div>
-            <div class="tags">${sh.slice(0,3).map(s=>`<div class="sd" style="background:${shiftColor(s.type)}" title="${esc(s.type)}"></div>`).join('')}${sh.length>3?`<div class="sub" style="font-size:9px;text-align:center;margin-top:2px">+${sh.length-3}</div>`:''}</div>
+            <div class="tags">${sh.slice(0,3).map(s=>`<div class="sd" style="background:${shiftColor(s.type)}" title="${esc(s.type)}"></div>`).join('')}${sh.length>3?`<div class="sub" style="font-size:calc(9px * var(--fs));text-align:center;margin-top:2px">+${sh.length-3}</div>`:''}</div>
           </div>`;}).join('')}
       </div>
       <div class="cal-legend">
@@ -2891,7 +2891,7 @@ function pageMe(){
     </div>
 
     <div class="card" style="text-align:center">
-      <div style="font-size:30px">🌺</div>
+      <div style="font-size:calc(30px * var(--fs))">🌺</div>
       <div style="font-weight:700;margin-top:4px">火焰兰 PersonalOS</div>
       <div class="sub mt8">版本 V6.1.1</div>
       <div class="sub" style="margin-top:2px">底层基座 WorkBuddy · v1.0.0</div>
@@ -2983,7 +2983,7 @@ function clearImages(){
 }
 function resetData(){
   openModal(`<h3>⚠️ 重置数据 <button class="x" onclick="closeModal()">✕</button></h3>
-    <p style="font-size:14px;color:var(--sub)">此操作将<b style="color:#e0908b">清空全部账单、任务、速记与个人资料</b>，且不可恢复。建议先导出备份。</p>
+    <p style="font-size:calc(14px * var(--fs));color:var(--sub)">此操作将<b style="color:#e0908b">清空全部账单、任务、速记与个人资料</b>，且不可恢复。建议先导出备份。</p>
     <div class="f-label">请输入「重置」两个字确认</div>
     <input id="resetConfirm" placeholder="重置">
     <div class="grid2 mt16">
@@ -3125,7 +3125,7 @@ function delTask(id){S.tasks=S.tasks.filter(x=>x.id!==id);Object.keys(S.taskImgs
 function stopRepeat(id){
   const t=S.tasks.find(x=>x.id===id);if(!t)return;
   openModal(`<h3>🔁 循环任务操作 <button class="x" onclick="closeModal()">✕</button></h3>
-    <p style="font-size:14px;color:var(--sub)">「${esc(t.title)}」</p>
+    <p style="font-size:calc(14px * var(--fs));color:var(--sub)">「${esc(t.title)}」</p>
     <div class="grid2 mt16">
       <button class="btn btn-ghost" onclick="skipToday('${id}')">仅跳过今天</button>
       <button class="btn btn-coral" onclick="endRepeat('${id}')">终止循环</button>
@@ -3359,7 +3359,7 @@ function openHistory(){
     ${all.length?all.map(x=>`
       <div class="bill">
         <div class="grow">
-          <div style="font-size:14px;font-weight:500">${esc(x.txt)}</div>
+          <div style="font-size:calc(14px * var(--fs));font-weight:500">${esc(x.txt)}</div>
           <div class="sub">${esc(x.date)}${x.sub?' · '+esc(x.sub):''}</div>
         </div>
         <span style="font-weight:700;color:${x.c}">${x.amt}</span>
