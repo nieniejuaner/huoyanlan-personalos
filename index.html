@@ -1522,9 +1522,9 @@ function calNormTime(s){ if(s===undefined||s===null||s==='') return ''; s=String
 function buildICS(tab){
   const ev=[];
   if(tab==='study'){
-    (S?S.tasks||[]).forEach(t=>{ const d=t.sdate||t.date||''; if(d) ev.push({title:t.title||t.type||'学习任务', date:d, allDay:true}); });
+    ((S&&S.tasks)||[]).forEach(t=>{ const d=t.sdate||t.date||''; if(d) ev.push({title:t.title||t.type||'学习任务', date:d, allDay:true}); });
   } else {
-    (S?S.shifts||[]).forEach(sh=>{ const d=sh.date; if(d) ev.push({title:sh.key||'班次', date:d, dtstart:(sh.start!==undefined&&sh.start!=='')?sh.date.replace(/-/g,'').replace(/\.\d+/,'')+'T'+calNormTime(sh.start):undefined, dtend:(sh.end!==undefined&&sh.end!=='')?sh.date.replace(/-/g,'').replace(/\.\d+/,'')+'T'+calNormTime(sh.end):undefined}); });
+    ((S&&S.shifts)||[]).forEach(sh=>{ const d=sh.date; if(d) ev.push({title:sh.key||'班次', date:d, dtstart:(sh.start!==undefined&&sh.start!=='')?sh.date.replace(/-/g,'').replace(/\.\d+/,'')+'T'+calNormTime(sh.start):undefined, dtend:(sh.end!==undefined&&sh.end!=='')?sh.date.replace(/-/g,'').replace(/\.\d+/,'')+'T'+calNormTime(sh.end):undefined}); });
   }
   let s='BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//huoyanlan//PersonalOS//CN\nCALSCALE:GREGORIAN\n';
   ev.forEach((e,i)=>{
@@ -1547,7 +1547,7 @@ function syncCal(tab){ downloadICS(tab==='study'?'学习日历':'排班日历', 
 function openNativeCal(){
   const ua=navigator.userAgent;
   if(/iPhone|iPad|iPod/.test(ua)) location.href='calshow://';
-  else if(/Android/.test(ua)) location.href='intent://#Intent;action=android.intent.action.VIEW;type=vnd.android.cursor.item/event;S.b讲owser_fallback_url=https%3A%2F%2Fwww.google.com%2Fcalendar;end';
+  else if(/Android/.test(ua)) location.href='intent://#Intent;action=android.intent.action.VIEW;type=vnd.android.cursor.item/event;S.browser_fallback_url=https%3A%2F%2Fwww.google.com%2Fcalendar;end';
   else toast('当前平台无直接唤起，请用「生成 .ics」导入');
 }
 function pageStudy(){
