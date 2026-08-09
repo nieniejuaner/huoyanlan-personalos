@@ -3440,7 +3440,8 @@ const FOOD_PRESETS=[
   {n:'鸡蛋1个',k:70},{n:'鸡胸肉100g',k:130},{n:'牛肉100g',k:250},{n:'西兰花100g',k:35},
   {n:'苹果1个',k:95},{n:'香蕉1根',k:105},{n:'牛奶1杯',k:150},{n:'奶茶中杯',k:350}
 ];
-function currentWeight(){const ws=S.weights.slice().sort((a,b)=>a.ts-b.ts);return ws.length?ws[ws.length-1].value:(Number(S.dietGoal.startWeight)||55);}
+function currentWeight(){const t=today();const ws=S.weights.filter(w=>w.date===t).sort((a,b)=>b.ts-a.ts);return ws.length?ws[0].value:null;}
+function baseWeight(){const ws=S.weights.slice().sort((a,b)=>b.ts-a.ts);return ws.length?ws[ws.length-1].value:(Number(S.dietGoal.startWeight)||55);}
 function sportKcal(met,min,w){return Math.round((Number(met)||0)*(Number(w)||55)*(Number(min)||0)/60);}
 function dietHomeHTML(){
   const t=today();
@@ -3519,8 +3520,8 @@ function pageDiet(){
   const net=inK-outK;
   const w=currentWeight();
   const tw=Number(goal.targetWeight)||0,sw=Number(goal.startWeight)||0,h=Number(goal.height)||0,tk=Number(goal.targetKcal)||0;
-  const bmi=h?+(w/((h/100)*(h/100))).toFixed(1):0;
-  const lost=sw?+(sw-w).toFixed(1):0;
+  const bmi=(h&&w)?+(w/((h/100)*(h/100))).toFixed(1):0;
+  const lost=sw?+(sw-(w||sw)).toFixed(1):0;
   return `
   <div class="page-anim">
     <div class="row" style="margin:4px 2px 14px">
@@ -3593,7 +3594,7 @@ function saveFood(){
   closeModal();commit();toast('已记录饮食 '+kcal+' kcal');
 }
 function openSportModal(){
-  const w=currentWeight();
+  const w=baseWeight();
   const chips=SPORT_PRESETS.map(p=>'<span class="chip-st '+(p.met===_sportMet?'on':'')+'" onclick="pickMet('+p.met+',\''+esc(p.n)+'\')">'+esc(p.n)+'</span>').join('');
   openModal(`<h3>🔥 记录运动消耗 <button class="x" onclick="closeModal()">✕</button></h3>
     <div class="f-label">运动项目</div><input id="sName" placeholder="如：晨跑">
@@ -3610,11 +3611,11 @@ function openSportModal(){
     <button class="btn btn-grass btn-block mt8" onclick="saveSport()">保存运动</button>`);
 }
 function pickMet(met,n){_sportMet=met;const a=$('#sMet');if(a)a.value=met;const b=$('#sName');if(b&&!b.value)b.value=n;updSportKcal();}
-function updSportKcal(){const met=Number($('#sMet').value)||0,min=Number($('#sMin').value)||0,w=currentWeight();const e=$('#sKcalPrev');if(e)e.textContent=sportKcal(met,min,w)+' kcal';}
+function updSportKcal(){const met=Number($('#sMet').value)||0,min=Number($('#sMin').value)||0,w=baseWeight();const e=$('#sKcalPrev');if(e)e.textContent=sportKcal(met,min,w)+' kcal';}
 function saveSport(){
   const name=$('#sName').value.trim()||'运动',min=Number($('#sMin').value)||0,met=Number($('#sMet').value)||0;
   if(min<=0||met<=0){toast('请填写时长和强度');return;}
-  const w=currentWeight(),kcal=sportKcal(met,min,w);
+  const w=baseWeight(),kcal=sportKcal(met,min,w);
   S.sports.push({id:uid(),ts:Date.now(),date:$('#sDate').value||today(),name,minutes:min,met,kcal});
   closeModal();commit();toast('已记录运动 -'+kcal+' kcal');
 }
