@@ -1130,6 +1130,7 @@ let giftTab='in';
 let giftQuery='';
 let moneyView='book';
 let dietTrendCollapsed=false;
+let dietCollapsed={food:false,sport:false,weight:false};
 let giftSel={};
 let shiftMonth='';
 let shiftSelDate='';
@@ -3493,8 +3494,9 @@ function weightBarsHTML(compact){
   return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;margin-top:8px">'+grid+(area?'<path d="'+area+'" fill="rgba(58,167,159,0.12)" stroke="none"/>':'')+'<path d="'+dpath+'" fill="none" stroke="#3aa79f" stroke-width="'+(compact?2:2.2)+'" stroke-linecap="round" stroke-linejoin="round"/>'+target+dots+xlab+'</svg>';
 }
 function toggleDietTrend(){ dietTrendCollapsed=!dietTrendCollapsed; render(); }
+function toggleDietCard(k){ dietCollapsed[k]=!dietCollapsed[k]; render(); }
 function openWeightHistory(){
-  const all=S.weights.slice().sort((a,b)=>a.ts-b.ts); // 按时间升序（早 → 晚）
+  const all=S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}); // 按称重日期升序（早 → 晚），同日按录入时间
   const list=all.length?all.map(function(w,i){
     const prev=all[i-1];
     const delta=prev?+(w.value-prev.value).toFixed(1):null;
@@ -3506,7 +3508,7 @@ function openWeightHistory(){
       '<div style="font-weight:700;color:'+dcol+'">'+dtext+'</div></div>';
   }).join(''):'<div class="empty">还没有体重记录，点下方「＋ 记录体重」</div>';
   openModal('<h3>📉 体重历史记录 <button class="x" onclick="closeModal()">✕</button></h3>'+
-    '<div class="sub" style="margin:2px 0 8px">共 '+all.length+' 条 · 按时间顺序（早 → 晚）· 点击记录可删除</div>'+
+    '<div class="sub" style="margin:2px 0 8px">共 '+all.length+' 条 · 按称重日期（早 → 晚）· 点击记录可删除</div>'+
     weightBarsHTML(false)+
     '<div style="margin-top:10px">'+list+'</div>'+
     '<button class="btn btn-grass btn-block mt8" onclick="closeModal();openWeightModal()">＋ 记录体重</button>');
@@ -3584,16 +3586,31 @@ function pageDiet(){
     </div>
 
     <div class="card">
-      <div class="card-title">🍽 今日饮食 <span class="sub" style="font-weight:400">共 ${inK} kcal</span></div>
-      ${foodsToday.length?foodsToday.map(foodRow).join(''):`<div class="empty">今天还没记录饮食，点「＋ 吃了什么」</div>`}
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="cursor:pointer" onclick="toggleDietCard('food')">🍽 今日饮食 <span class="sub" style="font-weight:400">共 ${inK} kcal</span></span>
+        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleDietCard('food')">${dietCollapsed.food?'▸':'▾'}</span>
+      </div>
+      ${dietCollapsed.food?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+foodsToday.length+' 条）</div>':(foodsToday.length?foodsToday.map(foodRow).join(''):`<div class="empty">今天还没记录饮食，点「＋ 吃了什么」</div>`)}
     </div>
 
     <div class="card">
-      <div class="card-title">🔥 今日运动 <span class="sub" style="font-weight:400">共 ${outK} kcal</span></div>
-      ${sportsToday.length?sportsToday.map(sportRow).join(''):`<div class="empty">今天还没记录运动，点「＋ 运动消耗」</div>`}
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="cursor:pointer" onclick="toggleDietCard('sport')">🔥 今日运动 <span class="sub" style="font-weight:400">共 ${outK} kcal</span></span>
+        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleDietCard('sport')">${dietCollapsed.sport?'▸':'▾'}</span>
+      </div>
+      ${dietCollapsed.sport?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+sportsToday.length+' 条）</div>':(sportsToday.length?sportsToday.map(sportRow).join(''):`<div class="empty">今天还没记录运动，点「＋ 运动消耗」</div>`)}
     </div>
 
-    ${S.weights.length?`<div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center"><span>📉 历史体重</span><span style="font-size:calc(12.5px * var(--fs));font-weight:500;color:var(--coral);cursor:pointer" onclick="openWeightHistory()">全部 ${S.weights.length} 条 ›</span></div>${S.weights.slice().sort((a,b)=>a.ts-b.ts).slice(0,10).map(weightRow).join('')}</div>`:''}
+    ${S.weights.length?`<div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="cursor:pointer" onclick="toggleDietCard('weight')">📉 历史体重</span>
+        <span style="display:flex;gap:12px;align-items:center">
+          <span style="font-size:calc(12.5px * var(--fs));font-weight:500;color:var(--coral);cursor:pointer" onclick="openWeightHistory()">全部 ${S.weights.length} 条 ›</span>
+          <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleDietCard('weight')">${dietCollapsed.weight?'▸':'▾'}</span>
+        </span>
+      </div>
+      ${dietCollapsed.weight?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+S.weights.length+' 条）</div>':S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}).slice(0,10).map(weightRow).join('')}
+    </div>`:''}
   </div>`;
 }
 function openFoodModal(){
