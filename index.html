@@ -1129,6 +1129,7 @@ let ovSearch='';
 let giftTab='in';
 let giftQuery='';
 let moneyView='book';
+let ledgerCollapsed={income:false,daily:false,mood:false};
 let dietTrendCollapsed=false;
 let dietCollapsed={food:false,sport:false,weight:false};
 let giftSel={};
@@ -2026,8 +2027,8 @@ function filterExp(q){
   const fInc=!q?inc:inc.filter(i=>String(i.category).includes(q)||String(i.note||'').includes(q));
   const fExp=!q?exp:exp.filter(e=>String(e.category).includes(q)||String(e.note||'').includes(q));
   const il=$('#incomeList');if(il)il.innerHTML=fInc.length?fInc.map(incomeRow).join(''):`<div class="empty">暂无收入分配记录</div>`;
-  $('#dailyList').innerHTML=fExp.filter(e=>e.account==='daily').map(billRow).join('')||`<div class="empty">暂无日常支出</div>`;
-  $('#moodList').innerHTML=fExp.filter(e=>e.account==='mood').map(billRow).join('')||`<div class="empty">还没有犒劳自己的记录</div>`;
+  const dl=$('#dailyList');if(dl)dl.innerHTML=fExp.filter(e=>e.account==='daily').map(billRow).join('')||`<div class="empty">暂无日常支出</div>`;
+  const ml=$('#moodList');if(ml)ml.innerHTML=fExp.filter(e=>e.account==='mood').map(billRow).join('')||`<div class="empty">还没有犒劳自己的记录</div>`;
   const r=$('#expSummary');if(r)r.innerHTML=expSummaryHTML();
 }
 function filterExpMonth(v){
@@ -2135,8 +2136,11 @@ function pageMoney(){
     </div>
 
     <div class="card">
-      <div class="card-title">💰 收入记录 <span class="sub" style="font-weight:400">删除自动回滚余额</span></div>
-      <div id="incomeList">${incomes.length?incomes.map(incomeRow).join(''):`<div class="empty">暂无收入分配记录</div>`}</div>
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="cursor:pointer" onclick="toggleLedger('income')">💰 收入记录 <span class="sub" style="font-weight:400">删除自动回滚余额</span></span>
+        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleLedger('income')">${ledgerCollapsed.income?'▸':'▾'}</span>
+      </div>
+      ${ledgerCollapsed.income?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+incomes.length+' 条）</div>':(incomes.length?`<div id="incomeList">${incomes.map(incomeRow).join('')}</div>`:`<div class="empty">暂无收入分配记录</div>`)}
     </div>
 
     <div class="card">
@@ -2151,13 +2155,19 @@ function pageMoney(){
     </div>
 
     <div class="card">
-      <div class="card-title">🧾 日常支出 <span class="sub" style="font-weight:400">删除自动返还余额</span></div>
-      <div id="dailyList">${daily.length?daily.map(billRow).join(''):`<div class="empty">暂无日常支出</div>`}</div>
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="cursor:pointer" onclick="toggleLedger('daily')">🧾 日常支出 <span class="sub" style="font-weight:400">删除自动返还余额</span></span>
+        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleLedger('daily')">${ledgerCollapsed.daily?'▸':'▾'}</span>
+      </div>
+      ${ledgerCollapsed.daily?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+daily.length+' 条）</div>':(daily.length?`<div id="dailyList">${daily.map(billRow).join('')}</div>`:`<div class="empty">暂无日常支出</div>`)}
     </div>
 
     <div class="card">
-      <div class="card-title">✨ 为心情买单</div>
-      <div id="moodList">${mood.length?mood.map(billRow).join(''):`<div class="empty">还没有犒劳自己的记录</div>`}</div>
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span style="cursor:pointer" onclick="toggleLedger('mood')">✨ 为心情买单</span>
+        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleLedger('mood')">${ledgerCollapsed.mood?'▸':'▾'}</span>
+      </div>
+      ${ledgerCollapsed.mood?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+mood.length+' 条）</div>':(mood.length?`<div id="moodList">${mood.map(billRow).join('')}</div>`:`<div class="empty">还没有犒劳自己的记录</div>`)}
     </div>
 
     <div class="card">
@@ -3495,6 +3505,7 @@ function weightBarsHTML(compact){
 }
 function toggleDietTrend(){ dietTrendCollapsed=!dietTrendCollapsed; render(); }
 function toggleDietCard(k){ dietCollapsed[k]=!dietCollapsed[k]; render(); }
+function toggleLedger(k){ ledgerCollapsed[k]=!ledgerCollapsed[k]; render(); }
 function openWeightHistory(){
   const all=S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}); // 按称重日期升序（早 → 晚），同日按录入时间
   const list=all.length?all.map(function(w,i){
@@ -3609,7 +3620,7 @@ function pageDiet(){
           <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleDietCard('weight')">${dietCollapsed.weight?'▸':'▾'}</span>
         </span>
       </div>
-      ${dietCollapsed.weight?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+S.weights.length+' 条）</div>':S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}).slice(0,10).map(weightRow).join('')}
+      ${dietCollapsed.weight?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+S.weights.length+' 条）</div>':S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}).slice(0,6).map(weightRow).join('')}
     </div>`:''}
   </div>`;
 }
