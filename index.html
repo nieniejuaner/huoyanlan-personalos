@@ -1129,6 +1129,7 @@ let ovSearch='';
 let giftTab='in';
 let giftQuery='';
 let moneyView='book';
+let dietTrendCollapsed=false;
 let giftSel={};
 let shiftMonth='';
 let shiftSelDate='';
@@ -3454,41 +3455,61 @@ function dietHomeHTML(){
     '<div style="background:#e7f6e7;border-radius:14px;padding:12px"><div class="sub">🔥 消耗</div><div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px;color:#3aa79f">'+outK+' kcal</div></div>'+
     '</div><div class="row mt12" style="justify-content:space-between;font-size:calc(12.5px * var(--fs));color:var(--sub)"><span>净摄入 <b style="color:'+(net<=0?'#3aa79f':'#e0908b')+'">'+net+' kcal</b></span><span>进入记录饮食/运动 ›</span></div>';
 }
-function weightBarsHTML(){
+function weightBarsHTML(compact){
   // 按日期聚合（每天取最新一次），再按日期升序排列（左旧 → 右新）
   const map={};
   S.weights.forEach(function(w){ if(!map[w.date]||w.ts>(map[w.date].ts||0)) map[w.date]={value:w.value,ts:w.ts}; });
   const dates=Object.keys(map).sort();
-  if(dates.length<2)return '<div class="sub" style="text-align:center;margin-top:6px">记录 2 天以上体重即可查看趋势曲线</div>';
+  if(dates.length===0)return '<div class="sub" style="text-align:center;margin-top:6px">'+(compact?'暂无体重记录':'记录体重即可查看趋势曲线')+'</div>';
   const pts=dates.map(function(d){return {d:d,v:map[d].value};});
   const vals=pts.map(function(p){return p.v;});
   let vmin=Math.min.apply(null,vals), vmax=Math.max.apply(null,vals);
   const pad=(vmax-vmin)*0.18||1; vmin-=pad; vmax+=pad;
   if(vmax<=vmin){vmin-=1;vmax+=1;}
-  const W=320,H=174,padL=30,padR=12,padT=16,padB=26;
+  const H=compact?62:174, W=320,padL=compact?6:30,padR=compact?6:12,padT=compact?8:16,padB=compact?16:26;
   const pw=W-padL-padR, ph=H-padT-padB, n=pts.length;
   function X(i){return padL+(n===1?pw/2:pw*i/(n-1));}
   function Y(v){return padT+ph*(vmax-v)/(vmax-vmin);}
   const P=pts.map(function(p,i){return {x:X(i),y:Y(p.v)};});
   let dpath='M'+P[0].x.toFixed(1)+' '+P[0].y.toFixed(1);
-  for(let i=0;i<n-1;i++){
+  if(n>1){ for(let i=0;i<n-1;i++){
     const p0=P[i-1]||P[i], p1=P[i], p2=P[i+1], p3=P[i+2]||P[i+1];
     const c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6;
     const c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
     dpath+=' C'+c1x.toFixed(1)+' '+c1y.toFixed(1)+' '+c2x.toFixed(1)+' '+c2y.toFixed(1)+' '+p2.x.toFixed(1)+' '+p2.y.toFixed(1);
-  }
+  } }
   const baseY=(padT+ph).toFixed(1);
-  const area=dpath+' L'+P[n-1].x.toFixed(1)+' '+baseY+' L'+P[0].x.toFixed(1)+' '+baseY+' Z';
+  let area=''; if(n>1) area=dpath+' L'+P[n-1].x.toFixed(1)+' '+baseY+' L'+P[0].x.toFixed(1)+' '+baseY+' Z';
   let grid='';
-  for(let k=0;k<=2;k++){ const v=vmax-(vmax-vmin)*k/2; const y=Y(v); grid+='<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'" stroke="#ece5e2" stroke-width="1"/><text x="'+(padL-4)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="#a99e99">'+Math.round(v)+'</text>'; }
+  if(!compact){ for(let k=0;k<=2;k++){ const v=vmax-(vmax-vmin)*k/2; const y=Y(v); grid+='<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'" stroke="#ece5e2" stroke-width="1"/><text x="'+(padL-4)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="#a99e99">'+Math.round(v)+'</text>'; } }
   let dots='';
-  pts.forEach(function(p,i){ const x=X(i),y=Y(p.v); dots+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="3" fill="#3aa79f" stroke="#fff" stroke-width="1.5"/>'; if(n<=8) dots+='<text x="'+x.toFixed(1)+'" y="'+(y-7).toFixed(1)+'" text-anchor="middle" font-size="9" fill="#4f807c">'+p.v+'</text>'; });
+  pts.forEach(function(p,i){ const x=X(i),y=Y(p.v); dots+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(compact?2.5:3)+'" fill="#3aa79f" stroke="#fff" stroke-width="1.5"/>'; if(!compact&&n<=8) dots+='<text x="'+x.toFixed(1)+'" y="'+(y-7).toFixed(1)+'" text-anchor="middle" font-size="9" fill="#4f807c">'+p.v+'</text>'; });
   let xlab='';
-  pts.forEach(function(p,i){ const x=X(i); xlab+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="8.5" fill="#a99e99">'+String(p.d).slice(5)+'</text>'; });
+  pts.forEach(function(p,i){ const x=X(i); xlab+='<text x="'+x.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="'+(compact?7.5:8.5)+'" fill="#a99e99">'+String(p.d).slice(5)+'</text>'; });
   const tw=Number(S.dietGoal.targetWeight)||0;
   let target='';
   if(tw&&tw>=vmin&&tw<=vmax){ const ty=Y(tw).toFixed(1); target='<line x1="'+padL+'" y1="'+ty+'" x2="'+(W-padR)+'" y2="'+ty+'" stroke="#e0908b" stroke-width="1" stroke-dasharray="4 3"/><text x="'+(W-padR)+'" y="'+(Number(ty)-3).toFixed(1)+'" text-anchor="end" font-size="8.5" fill="#e0908b">目标 '+tw+'</text>'; }
-  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;margin-top:8px">'+grid+'<path d="'+area+'" fill="rgba(58,167,159,0.12)" stroke="none"/><path d="'+dpath+'" fill="none" stroke="#3aa79f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'+target+dots+xlab+'</svg>';
+  if(compact&&n===1){ xlab='<text x="'+(W/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="7.5" fill="#a99e99">'+String(pts[0].d).slice(5)+' · '+pts[0].v+'kg</text>'; }
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" style="display:block;margin-top:8px">'+grid+(area?'<path d="'+area+'" fill="rgba(58,167,159,0.12)" stroke="none"/>':'')+'<path d="'+dpath+'" fill="none" stroke="#3aa79f" stroke-width="'+(compact?2:2.2)+'" stroke-linecap="round" stroke-linejoin="round"/>'+target+dots+xlab+'</svg>';
+}
+function toggleDietTrend(){ dietTrendCollapsed=!dietTrendCollapsed; render(); }
+function openWeightHistory(){
+  const all=S.weights.slice().sort((a,b)=>a.ts-b.ts); // 按时间升序（早 → 晚）
+  const list=all.length?all.map(function(w,i){
+    const prev=all[i-1];
+    const delta=prev?+(w.value-prev.value).toFixed(1):null;
+    const dcol=delta>0?'#e0908b':(delta<0?'#3aa79f':'#a99e99');
+    const dtext=delta==null?'':(delta>0?'▲ +'+delta:(delta<0?'▼ '+delta:'± 0'));
+    return '<div class="bill" onclick="if(confirm(\'删除这条体重记录？\'))delWeight(\''+w.id+'\')">'+
+      '<div class="bill-ic" style="background:var(--grass)">⚖️</div>'+
+      '<div class="grow"><div style="font-size:calc(14.5px * var(--fs));font-weight:500">'+w.value+' kg</div><div class="sub">'+esc(w.date)+'</div></div>'+
+      '<div style="font-weight:700;color:'+dcol+'">'+dtext+'</div></div>';
+  }).join(''):'<div class="empty">还没有体重记录，点下方「＋ 记录体重」</div>';
+  openModal('<h3>📉 体重历史记录 <button class="x" onclick="closeModal()">✕</button></h3>'+
+    '<div class="sub" style="margin:2px 0 8px">共 '+all.length+' 条 · 按时间顺序（早 → 晚）· 点击记录可删除</div>'+
+    weightBarsHTML(false)+
+    '<div style="margin-top:10px">'+list+'</div>'+
+    '<button class="btn btn-grass btn-block mt8" onclick="closeModal();openWeightModal()">＋ 记录体重</button>');
 }
 function foodRow(x){
   const mealIc={早餐:'🌅',午餐:'☀️',晚餐:'🌙',加餐:'🍎'}[x.meal]||'🍽';
@@ -3531,14 +3552,20 @@ function pageDiet(){
     </div>
 
     <div class="card">
-      <div class="card-title">体重趋势</div>
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>体重趋势</span>
+        <span style="display:flex;gap:12px;align-items:center">
+          <span style="font-size:calc(12.5px * var(--fs));font-weight:500;color:var(--coral);cursor:pointer" onclick="openWeightHistory()">查看全部 ›</span>
+          <span style="font-size:calc(12.5px * var(--fs));font-weight:500;color:var(--coral);cursor:pointer" onclick="toggleDietTrend()">${dietTrendCollapsed?'▸ 展开':'▾ 收起'}</span>
+        </span>
+      </div>
       <div class="row" style="justify-content:space-around;text-align:center;margin:6px 0">
         <div><div class="sub">当前</div><div style="font-weight:700;font-size:calc(20px * var(--fs))">${w?w+' kg':'—'}</div></div>
         <div><div class="sub">目标</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:#3aa79f">${tw?tw+' kg':'—'}</div></div>
         <div><div class="sub">已减</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:${lost>0?'#3aa79f':'#e0908b'}">${lost?((lost>0?'+':'')+lost+' kg'):'—'}</div></div>
         ${bmi?`<div><div class="sub">BMI</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:${bmi>24?'#e0908b':(bmi<18.5?'#c98d88':'#3aa79f')}">${bmi}</div></div>`:''}
       </div>
-      ${weightBarsHTML()}
+      <div ${S.weights.length?'onclick="openWeightHistory()" style="cursor:pointer"':''}>${dietTrendCollapsed?weightBarsHTML(true):weightBarsHTML(false)}</div>
       <button class="btn btn-grass btn-block mt8" onclick="openWeightModal()">＋ 记录体重</button>
     </div>
 
@@ -3566,7 +3593,7 @@ function pageDiet(){
       ${sportsToday.length?sportsToday.map(sportRow).join(''):`<div class="empty">今天还没记录运动，点「＋ 运动消耗」</div>`}
     </div>
 
-    ${S.weights.length?`<div class="card"><div class="card-title">📉 历史体重</div>${S.weights.slice().sort((a,b)=>b.ts-a.ts).slice(0,10).map(weightRow).join('')}</div>`:''}
+    ${S.weights.length?`<div class="card"><div class="card-title" style="display:flex;justify-content:space-between;align-items:center"><span>📉 历史体重</span><span style="font-size:calc(12.5px * var(--fs));font-weight:500;color:var(--coral);cursor:pointer" onclick="openWeightHistory()">全部 ${S.weights.length} 条 ›</span></div>${S.weights.slice().sort((a,b)=>a.ts-b.ts).slice(0,10).map(weightRow).join('')}</div>`:''}
   </div>`;
 }
 function openFoodModal(){
