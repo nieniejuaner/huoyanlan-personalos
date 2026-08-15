@@ -409,7 +409,7 @@ const DEF={
   expenseCats:['餐饮','交通','购物','居家','医疗','其他'],
   moodCats:['娱乐','美妆','奶茶咖啡','游戏','宠爱自己','其他'],
   chat:[],
-  foods:[],sports:[],weights:[],
+  weights:[],
   dietGoal:{targetWeight:0,startWeight:0,height:0,targetKcal:0}
 };
 /* 排班班次类型（沿用四色规范 + 中性灰，保持低视觉干扰） */
@@ -1122,8 +1122,6 @@ let studyView='all';
 let ovFilter='all';
 let ovCalMonth='';
 let ovCalSel='';
-let foodMeal='午餐';
-let _sportMet=4.3;
 let ovDate='';
 let ovSearch='';
 let giftTab='in';
@@ -1131,7 +1129,7 @@ let giftQuery='';
 let moneyView='book';
 let ledgerCollapsed={income:false,daily:false,mood:false};
 let dietTrendCollapsed=false;
-let dietCollapsed={food:false,sport:false,weight:false};
+let dietCollapsed={weight:false};
 let giftSel={};
 let shiftMonth='';
 let shiftSelDate='';
@@ -3420,13 +3418,10 @@ function aiReply(q){
     return `🤖 人情台账整理\n本月：收到 +${fmt(g.gin)}，送出 -${fmt(g.gout)}，净差 ${g.net>=0?'+':''}${fmt(g.net)}\n${lines.length?'往来明细：\n'+lines.join('\n'):'暂无份子记录'}\n提示：送出份子钱会从🏦存钱账户余额扣减，收到份子钱计入🏦存钱账户余额。`;
   }
   if(/减肥|热量|卡路里|体重|运动|饮食/.test(q)){
-    const t=today();
-    const inK=S.foods.filter(f=>f.date===t).reduce((s,f)=>s+(+f.kcal||0),0);
-    const outK=S.sports.filter(s=>s.date===t).reduce((s,x)=>s+(+x.kcal||0),0);
     const w=currentWeight(),g=S.dietGoal;
     const bmi=g.height?+(w/((g.height/100)*(g.height/100))).toFixed(1):0;
-    const tk=g.targetKcal?`（每日建议摄入 ${g.targetKcal} kcal，今日${inK-outK<=g.targetKcal?'未超标 ✅':'已超 '+(inK-outK-g.targetKcal)+' kcal ⚠️'}）`:'';
-    return `🤖 减肥打卡小助手\n⚖️ 当前体重：${w?w+' kg':'尚未记录'}；目标 ${g.targetWeight?g.targetWeight+' kg':'未设'}${bmi?`，BMI ${bmi}`:''}。\n🔥 今日摄入 ${inK} kcal，消耗 ${outK} kcal，净摄入 ${inK-outK} kcal${tk}。\n建议：制造 300~500 kcal 的热量缺口最稳妥，配合蛋白质+力量训练能更好保留肌肉。点「减肥」页可记录饮食与运动。`;
+    const lost=g.startWeight?+(g.startWeight-(w||g.startWeight)).toFixed(1):0;
+    return `🤖 减肥打卡小助手\n⚖️ 当前体重：${w?w+' kg':'尚未记录'}；目标 ${g.targetWeight?g.targetWeight+' kg':'未设'}${bmi?`，BMI ${bmi}`:''}${lost?`，已减 ${lost} kg`:''}。\n建议：每周稳定下降 0.3~0.5 kg 最健康，配合饮食控制与运动能更好保留肌肉。点「减肥」页可记录每日体重。`;
   }
   return `🤖 收到你的问题「${q}」。\n我是火焰兰 PersonalOS 的本地 AI 助手，基于你的本地数据可以帮你：今日复盘、任务计划、消费分析、人情台账整理、减肥打卡。试试点击上方快捷指令吧～`;
 }
@@ -3442,29 +3437,17 @@ function pushChat(q){
   setTimeout(()=>{const box=$('#chatBox');if(box)box.scrollTop=box.scrollHeight;},50);
 }
 
-/* ================= 减肥板块（饮食 / 运动 / 卡路里 / 体重） ================= */
-const SPORT_PRESETS=[
-  {n:'跑步 8km/h',met:8.3},{n:'慢跑 7km/h',met:7.0},{n:'快走 6km/h',met:4.3},
-  {n:'骑行',met:6.8},{n:'游泳',met:6.0},{n:'跳绳',met:11.0},{n:'瑜伽',met:2.5},
-  {n:'力量训练',met:3.5},{n:'健身操',met:5.0},{n:'爬楼梯',met:8.8},{n:'步行',met:3.5}
-];
-const FOOD_PRESETS=[
-  {n:'米饭1碗',k:230},{n:'面条1碗',k:280},{n:'馒头1个',k:220},{n:'全麦面包1片',k:75},
-  {n:'鸡蛋1个',k:70},{n:'鸡胸肉100g',k:130},{n:'牛肉100g',k:250},{n:'西兰花100g',k:35},
-  {n:'苹果1个',k:95},{n:'香蕉1根',k:105},{n:'牛奶1杯',k:150},{n:'奶茶中杯',k:350}
-];
+/* ================= 减肥板块（记录体重） ================= */
 function currentWeight(){const t=today();const ws=S.weights.filter(w=>w.date===t).sort((a,b)=>b.ts-a.ts);return ws.length?ws[0].value:null;}
-function baseWeight(){const ws=S.weights.slice().sort((a,b)=>b.ts-a.ts);return ws.length?ws[ws.length-1].value:(Number(S.dietGoal.startWeight)||55);}
-function sportKcal(met,min,w){return Math.round((Number(met)||0)*(Number(w)||55)*(Number(min)||0)/60);}
 function dietHomeHTML(){
-  const t=today();
-  const inK=S.foods.filter(f=>f.date===t).reduce((s,f)=>s+(+f.kcal||0),0);
-  const outK=S.sports.filter(s=>s.date===t).reduce((s,x)=>s+(+x.kcal||0),0);
-  const net=inK-outK;
+  const w=currentWeight(),g=S.dietGoal;
+  const tw=Number(g.targetWeight)||0,sw=Number(g.startWeight)||0,h=Number(g.height)||0;
+  const bmi=(h&&w)?+(w/((h/100)*(h/100))).toFixed(1):0;
+  const lost=sw?+(sw-(w||sw)).toFixed(1):0;
   return '<div class="grid2">'+
-    '<div style="background:var(--line);border-radius:14px;padding:12px"><div class="sub">🍽 摄入</div><div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px">'+inK+' kcal</div></div>'+
-    '<div style="background:#e7f6e7;border-radius:14px;padding:12px"><div class="sub">🔥 消耗</div><div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px;color:#3aa79f">'+outK+' kcal</div></div>'+
-    '</div><div class="row mt12" style="justify-content:space-between;font-size:calc(12.5px * var(--fs));color:var(--sub)"><span>净摄入 <b style="color:'+(net<=0?'#3aa79f':'#e0908b')+'">'+net+' kcal</b></span><span>进入记录饮食/运动 ›</span></div>';
+    '<div style="background:var(--line);border-radius:14px;padding:12px"><div class="sub">⚖️ 当前体重</div><div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px">'+w+' kg</div></div>'+
+    '<div style="background:#e7f6e7;border-radius:14px;padding:12px"><div class="sub">🎯 目标</div><div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px;color:#3aa79f">'+tw+' kg</div></div>'+
+    '</div><div class="row mt12" style="justify-content:space-between;font-size:calc(12.5px * var(--fs));color:var(--sub)"><span>已减 <b style="color:'+(lost>0?'#3aa79f':'#e0908b')+'">'+lost+' kg</b>'+(bmi?' · BMI '+bmi:'')+'</span><span>进入记录体重 ›</span></div>';
 }
 function weightBarsHTML(compact){
   // 按日期聚合（每天取最新一次），再按日期升序排列（左旧 → 右新）
@@ -3524,37 +3507,17 @@ function openWeightHistory(){
     '<div style="margin-top:10px">'+list+'</div>'+
     '<button class="btn btn-grass btn-block mt8" onclick="closeModal();openWeightModal()">＋ 记录体重</button>');
 }
-function foodRow(x){
-  const mealIc={早餐:'🌅',午餐:'☀️',晚餐:'🌙',加餐:'🍎'}[x.meal]||'🍽';
-  return '<div class="bill" onclick="if(confirm(\'删除这条饮食记录？\'))delFood(\''+x.id+'\')">'+
-    '<div class="bill-ic" style="background:#fdeeed">'+mealIc+'</div>'+
-    '<div class="grow"><div style="font-size:calc(14.5px * var(--fs));font-weight:500">'+esc(x.name)+'</div><div class="sub">'+esc(x.meal)+' · '+esc(x.date)+'</div></div>'+
-    '<div style="font-weight:700;color:#e0908b">'+x.kcal+' kcal</div></div>';
-}
-function sportRow(x){
-  return '<div class="bill" onclick="if(confirm(\'删除这条运动记录？\'))delSport(\''+x.id+'\')">'+
-    '<div class="bill-ic" style="background:var(--aqua)">🏃</div>'+
-    '<div class="grow"><div style="font-size:calc(14.5px * var(--fs));font-weight:500">'+esc(x.name)+'</div><div class="sub">'+x.minutes+' 分钟 · 强度 '+x.met+' MET · '+esc(x.date)+'</div></div>'+
-    '<div style="font-weight:700;color:#3aa79f">-'+x.kcal+' kcal</div></div>';
-}
 function weightRow(x){
   return '<div class="bill" onclick="if(confirm(\'删除这条体重记录？\'))delWeight(\''+x.id+'\')">'+
     '<div class="bill-ic" style="background:var(--grass)">⚖️</div>'+
     '<div class="grow"><div style="font-size:calc(14.5px * var(--fs));font-weight:500">'+x.value+' kg</div><div class="sub">'+esc(x.date)+'</div></div>'+
     '<div class="sub">体重</div></div>';
 }
-function delFood(id){S.foods=S.foods.filter(x=>x.id!==id);commit();}
-function delSport(id){S.sports=S.sports.filter(x=>x.id!==id);commit();}
 function delWeight(id){S.weights=S.weights.filter(x=>x.id!==id);commit();}
 function pageDiet(){
   const goal=S.dietGoal,t=today();
-  const foodsToday=S.foods.filter(f=>f.date===t).sort((a,b)=>b.ts-a.ts);
-  const sportsToday=S.sports.filter(s=>s.date===t).sort((a,b)=>b.ts-a.ts);
-  const inK=foodsToday.reduce((s,f)=>s+(+f.kcal||0),0);
-  const outK=sportsToday.reduce((s,x)=>s+(+x.kcal||0),0);
-  const net=inK-outK;
   const w=currentWeight();
-  const tw=Number(goal.targetWeight)||0,sw=Number(goal.startWeight)||0,h=Number(goal.height)||0,tk=Number(goal.targetKcal)||0;
+  const tw=Number(goal.targetWeight)||0,sw=Number(goal.startWeight)||0,h=Number(goal.height)||0;
   const bmi=(h&&w)?+(w/((h/100)*(h/100))).toFixed(1):0;
   const lost=sw?+(sw-(w||sw)).toFixed(1):0;
   return `
@@ -3582,36 +3545,6 @@ function pageDiet(){
       <button class="btn btn-grass btn-block mt8" onclick="openWeightModal()">＋ 记录体重</button>
     </div>
 
-    <div class="card">
-      <div class="card-title">今日热量 <span class="sub" style="font-weight:400">摄入 / 消耗 / 净值</span></div>
-      <div class="row" style="justify-content:space-around;text-align:center;margin:6px 0 10px">
-        <div><div class="sub">🍽 摄入</div><div style="font-weight:700;font-size:calc(20px * var(--fs))">${inK}</div></div>
-        <div><div class="sub">🔥 消耗</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:#3aa79f">${outK}</div></div>
-        <div><div class="sub">净摄入</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:${net<=0?'#3aa79f':'#e0908b'}">${net}</div></div>
-      </div>
-      ${tk?`<div class="sub" style="text-align:center">建议每日摄入 <b style="color:#3aa79f">${tk} kcal</b>（${net<=tk?'✅ 今日未超标':'⚠️ 已超目标 '+(net-tk)+' kcal'}）</div>`:`<div class="sub" style="text-align:center">点右上「🎯 目标」设置每日摄入建议</div>`}
-      <div class="row mt8" style="gap:8px">
-        <button class="btn btn-coral btn-sm grow" onclick="openFoodModal()">＋ 吃了什么</button>
-        <button class="btn btn-grass btn-sm grow" onclick="openSportModal()">＋ 运动消耗</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span style="cursor:pointer" onclick="toggleDietCard('food')">🍽 今日饮食 <span class="sub" style="font-weight:400">共 ${inK} kcal</span></span>
-        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleDietCard('food')">${dietCollapsed.food?'▸':'▾'}</span>
-      </div>
-      ${dietCollapsed.food?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+foodsToday.length+' 条）</div>':(foodsToday.length?foodsToday.map(foodRow).join(''):`<div class="empty">今天还没记录饮食，点「＋ 吃了什么」</div>`)}
-    </div>
-
-    <div class="card">
-      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
-        <span style="cursor:pointer" onclick="toggleDietCard('sport')">🔥 今日运动 <span class="sub" style="font-weight:400">共 ${outK} kcal</span></span>
-        <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleDietCard('sport')">${dietCollapsed.sport?'▸':'▾'}</span>
-      </div>
-      ${dietCollapsed.sport?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+sportsToday.length+' 条）</div>':(sportsToday.length?sportsToday.map(sportRow).join(''):`<div class="empty">今天还没记录运动，点「＋ 运动消耗」</div>`)}
-    </div>
-
     ${S.weights.length?`<div class="card">
       <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
         <span style="cursor:pointer" onclick="toggleDietCard('weight')">📉 历史体重</span>
@@ -3623,57 +3556,6 @@ function pageDiet(){
       ${dietCollapsed.weight?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+S.weights.length+' 条）</div>':S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}).slice(0,6).map(weightRow).join('')}
     </div>`:''}
   </div>`;
-}
-function openFoodModal(){
-  const chips=FOOD_PRESETS.map(p=>'<span class="chip-st" onclick="fillFood(\''+esc(p.n)+'\','+p.k+')">'+esc(p.n)+' '+p.k+'</span>').join('');
-  openModal(`<h3>🍽 记录吃了什么 <button class="x" onclick="closeModal()">✕</button></h3>
-    <div class="f-label">餐次</div>
-    <div class="seg">
-      <button id="m0" class="${foodMeal==='早餐'?'on':''}" onclick="pickMeal('早餐')">🌅 早餐</button>
-      <button id="m1" class="${foodMeal==='午餐'?'on':''}" onclick="pickMeal('午餐')">☀️ 午餐</button>
-      <button id="m2" class="${foodMeal==='晚餐'?'on':''}" onclick="pickMeal('晚餐')">🌙 晚餐</button>
-      <button id="m3" class="${foodMeal==='加餐'?'on':''}" onclick="pickMeal('加餐')">🍎 加餐</button>
-    </div>
-    <div class="f-label">食物名称</div><input id="fName" placeholder="如：午餐·米饭+青菜">
-    <div class="f-label">热量 (kcal)</div><input id="fKcal" type="number" inputmode="decimal" placeholder="0">
-    <div class="f-label">日期</div><input id="fDate" type="date" value="${today()}">
-    <div class="sub mt8">💡 常用参考（点击填入，可修改）：</div>
-    <div class="chips-row" style="margin-top:6px">${chips}</div>
-    <button class="btn btn-coral btn-block mt8" onclick="saveFood()">保存饮食</button>`);
-}
-function pickMeal(v){foodMeal=v;['早餐','午餐','晚餐','加餐'].forEach((m,i)=>{const e=$('#m'+i);if(e)e.classList.toggle('on',m===v);});}
-function fillFood(n,k){const a=$('#fName'),b=$('#fKcal');if(a)a.value=n;if(b)b.value=k;}
-function saveFood(){
-  const name=$('#fName').value.trim(),kcal=Number($('#fKcal').value)||0;
-  if(!name||kcal<=0){toast('请填写食物名称和热量');return;}
-  S.foods.push({id:uid(),ts:Date.now(),date:$('#fDate').value||today(),meal:foodMeal,name,kcal});
-  closeModal();commit();toast('已记录饮食 '+kcal+' kcal');
-}
-function openSportModal(){
-  const w=baseWeight();
-  const chips=SPORT_PRESETS.map(p=>'<span class="chip-st '+(p.met===_sportMet?'on':'')+'" onclick="pickMet('+p.met+',\''+esc(p.n)+'\')">'+esc(p.n)+'</span>').join('');
-  openModal(`<h3>🔥 记录运动消耗 <button class="x" onclick="closeModal()">✕</button></h3>
-    <div class="f-label">运动项目</div><input id="sName" placeholder="如：晨跑">
-    <div class="f-label">运动类型（点选，自动估算强度）</div>
-    <div class="chips-row" style="margin-top:6px">${chips}</div>
-    <div class="grid2">
-      <div><div class="f-label">时长(分钟)</div><input id="sMin" type="number" inputmode="decimal" value="30" oninput="updSportKcal()"></div>
-      <div><div class="f-label">强度 MET</div><input id="sMet" type="number" inputmode="decimal" value="${_sportMet}" oninput="updSportKcal()"></div>
-    </div>
-    <div class="f-label">预计消耗</div>
-    <div style="font-size:calc(22px * var(--fs));font-weight:700;color:#3aa79f;text-align:center;padding:6px 0" id="sKcalPrev">${sportKcal(_sportMet,30,w)} kcal</div>
-    <div class="f-label">日期</div><input id="sDate" type="date" value="${today()}">
-    <p class="sub mt8">💡 消耗 ≈ 强度(MET) × 体重(${w}kg) × 时长 ÷ 60</p>
-    <button class="btn btn-grass btn-block mt8" onclick="saveSport()">保存运动</button>`);
-}
-function pickMet(met,n){_sportMet=met;const a=$('#sMet');if(a)a.value=met;const b=$('#sName');if(b&&!b.value)b.value=n;updSportKcal();}
-function updSportKcal(){const met=Number($('#sMet').value)||0,min=Number($('#sMin').value)||0,w=baseWeight();const e=$('#sKcalPrev');if(e)e.textContent=sportKcal(met,min,w)+' kcal';}
-function saveSport(){
-  const name=$('#sName').value.trim()||'运动',min=Number($('#sMin').value)||0,met=Number($('#sMet').value)||0;
-  if(min<=0||met<=0){toast('请填写时长和强度');return;}
-  const w=baseWeight(),kcal=sportKcal(met,min,w);
-  S.sports.push({id:uid(),ts:Date.now(),date:$('#sDate').value||today(),name,minutes:min,met,kcal});
-  closeModal();commit();toast('已记录运动 -'+kcal+' kcal');
 }
 function openWeightModal(){
   const w=currentWeight();
@@ -3694,12 +3576,11 @@ function openDietGoalModal(){
     <div class="f-label">目标体重 (kg)</div><input id="gT" type="number" inputmode="decimal" value="${g.targetWeight||''}" placeholder="如 50">
     <div class="f-label">起始体重 (kg)</div><input id="gS" type="number" inputmode="decimal" value="${g.startWeight||''}" placeholder="如 60">
     <div class="f-label">身高 (cm)</div><input id="gH" type="number" inputmode="decimal" value="${g.height||''}" placeholder="如 165">
-    <div class="f-label">每日建议摄入 (kcal)</div><input id="gC" type="number" inputmode="decimal" value="${g.targetKcal||''}" placeholder="如 1500">
-    <p class="sub mt8">💡 用于计算 BMI、「已减」进度与每日摄入是否超标</p>
+    <p class="sub mt8">💡 用于计算 BMI 与「已减」进度</p>
     <button class="btn btn-grass btn-block mt8" onclick="saveDietGoal()">保存目标</button>`);
 }
 function saveDietGoal(){
-  S.dietGoal={targetWeight:Number($('#gT').value)||0,startWeight:Number($('#gS').value)||0,height:Number($('#gH').value)||0,targetKcal:Number($('#gC').value)||0};
+  S.dietGoal={targetWeight:Number($('#gT').value)||0,startWeight:Number($('#gS').value)||0,height:Number($('#gH').value)||0,targetKcal:0};
   closeModal();commit();toast('目标已保存');
 }
 
