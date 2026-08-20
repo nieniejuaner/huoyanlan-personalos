@@ -3449,13 +3449,14 @@ function dietHomeHTML(){
     '<div style="background:#e7f6e7;border-radius:14px;padding:12px"><div class="sub">🎯 目标</div><div style="font-size:calc(19px * var(--fs));font-weight:700;margin-top:2px;color:#3aa79f">'+tw+' kg</div></div>'+
     '</div><div class="row mt12" style="justify-content:space-between;font-size:calc(12.5px * var(--fs));color:var(--sub)"><span>已减 <b style="color:'+(lost>0?'#3aa79f':'#e0908b')+'">'+lost+' kg</b>'+(bmi?' · BMI '+bmi:'')+'</span><span>进入记录体重 ›</span></div>';
 }
-function weightBarsHTML(compact){
+function weightBarsHTML(compact, limit){
   // 按日期聚合（每天取最新一次），再按日期升序排列（左旧 → 右新）
   const map={};
   S.weights.forEach(function(w){ if(!map[w.date]||w.ts>(map[w.date].ts||0)) map[w.date]={value:w.value,ts:w.ts}; });
   const dates=Object.keys(map).sort();
   if(dates.length===0)return '<div class="sub" style="text-align:center;margin-top:6px">'+(compact?'暂无体重记录':'记录体重即可查看趋势曲线')+'</div>';
-  const pts=dates.map(function(d){return {d:d,v:map[d].value};});
+  let pts=dates.map(function(d){return {d:d,v:map[d].value};});
+  if(limit&&pts.length>limit) pts=pts.slice(-limit); // 仅显示最新的 limit 条（按日期升序后的末尾）
   const vals=pts.map(function(p){return p.v;});
   let vmin=Math.min.apply(null,vals), vmax=Math.max.apply(null,vals);
   const pad=(vmax-vmin)*0.18||1; vmin-=pad; vmax+=pad;
@@ -3539,9 +3540,9 @@ function pageDiet(){
         <div><div class="sub">当前</div><div style="font-weight:700;font-size:calc(20px * var(--fs))">${w?w+' kg':'—'}</div></div>
         <div><div class="sub">目标</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:#3aa79f">${tw?tw+' kg':'—'}</div></div>
         <div><div class="sub">已减</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:${lost>0?'#3aa79f':'#e0908b'}">${lost?((lost>0?'+':'')+lost+' kg'):'—'}</div></div>
-        ${bmi?`<div><div class="sub">BMI</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:${bmi>24?'#e0908b':(bmi<18.5?'#c98d88':'#3aa79f')}">${bmi}</div></div>`:''}
+        <div><div class="sub">BMI</div><div style="font-weight:700;font-size:calc(20px * var(--fs));color:${bmi?(bmi>24?'#e0908b':(bmi<18.5?'#c98d88':'#3aa79f')):'var(--sub)'}">${bmi||'—'}</div></div>
       </div>
-      <div ${S.weights.length?'onclick="openWeightHistory()" style="cursor:pointer"':''}>${dietTrendCollapsed?weightBarsHTML(true):weightBarsHTML(false)}</div>
+      <div ${S.weights.length?'onclick="openWeightHistory()" style="cursor:pointer"':''}>${dietTrendCollapsed?weightBarsHTML(true,6):weightBarsHTML(false,6)}</div>
       <button class="btn btn-grass btn-block mt8" onclick="openWeightModal()">＋ 记录体重</button>
     </div>
 
@@ -3553,7 +3554,7 @@ function pageDiet(){
           <span style="font-size:calc(13px * var(--fs));font-weight:700;color:var(--coral);cursor:pointer" onclick="toggleDietCard('weight')">${dietCollapsed.weight?'▸':'▾'}</span>
         </span>
       </div>
-      ${dietCollapsed.weight?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+S.weights.length+' 条）</div>':S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}).slice(0,6).map(weightRow).join('')}
+      ${dietCollapsed.weight?'<div class="sub" style="text-align:center;padding:10px 0">已收起 · 点 ▸ 展开（共 '+S.weights.length+' 条）</div>':S.weights.slice().sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:a.ts-b.ts;}).slice(-6).map(weightRow).join('')}
     </div>`:''}
   </div>`;
 }
