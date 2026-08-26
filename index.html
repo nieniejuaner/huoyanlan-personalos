@@ -3477,10 +3477,11 @@ function weightBarsHTML(compact, limit){
   let area=''; if(n>1) area=dpath+' L'+P[n-1].x.toFixed(1)+' '+baseY+' L'+P[0].x.toFixed(1)+' '+baseY+' Z';
   let grid='';
   if(!compact){ for(let k=0;k<=2;k++){ const v=vmax-(vmax-vmin)*k/2; const y=Y(v); grid+='<line x1="'+padL+'" y1="'+y.toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y.toFixed(1)+'" stroke="#ece5e2" stroke-width="1"/><text x="'+(padL-4)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end" font-size="9" fill="#a99e99">'+Math.round(v)+'</text>'; } }
+  const labelStep=Math.max(1,Math.ceil(n/(compact?4:8))); // 日期/数值标签抽稀：记录越多间隔越大（始终显示首、尾）
   let dots='';
-  pts.forEach(function(p,i){ const x=X(i),y=Y(p.v); dots+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(compact?2.5:3)+'" fill="#3aa79f" stroke="#fff" stroke-width="1.5"/>'; if(!compact){ const fsz=(n<=8?9:8); const ly=Math.min((i%2===0?(y-7):(y+11)),H-20); dots+='<text x="'+x.toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="middle" font-size="'+fsz+'" fill="#4f807c">'+p.v+'</text>'; } });
+  pts.forEach(function(p,i){ const x=X(i),y=Y(p.v); dots+='<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="'+(compact?2.5:3)+'" fill="#3aa79f" stroke="#fff" stroke-width="1.5"/>'; if(!compact&&(i%labelStep===0||i===n-1)){ const fsz=(n<=8?9:8); const ly=Math.min(y-7,H-20); dots+='<text x="'+x.toFixed(1)+'" y="'+ly.toFixed(1)+'" text-anchor="middle" font-size="'+fsz+'" fill="#4f807c">'+p.v+'</text>'; } });
   let xlab='';
-  pts.forEach(function(p,i){ const x=X(i); xlab+='<text x="'+x.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="'+(compact?7.5:8.5)+'" fill="#a99e99">'+String(p.d).slice(5)+'</text>'; });
+  pts.forEach(function(p,i){ const x=X(i); if(i%labelStep===0||i===n-1) xlab+='<text x="'+x.toFixed(1)+'" y="'+(H-6)+'" text-anchor="middle" font-size="'+(compact?7.5:8.5)+'" fill="#a99e99">'+String(p.d).slice(5)+'</text>'; });
   const tw=Number(S.dietGoal.targetWeight)||0;
   let target='';
   if(tw&&tw>=vmin&&tw<=vmax){ const ty=Y(tw).toFixed(1); target='<line x1="'+padL+'" y1="'+ty+'" x2="'+(W-padR)+'" y2="'+ty+'" stroke="#e0908b" stroke-width="1" stroke-dasharray="4 3"/><text x="'+(W-padR)+'" y="'+(Number(ty)-3).toFixed(1)+'" text-anchor="end" font-size="8.5" fill="#e0908b">目标 '+tw+'</text>'; }
