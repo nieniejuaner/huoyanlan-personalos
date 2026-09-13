@@ -133,7 +133,7 @@ textarea{resize:none;min-height:72px}
 .bill-ic{width:34px;height:34px;min-width:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size: calc(16px * var(--fs));background:var(--line)}
 .ov-acts{display:flex;gap:6px;flex-shrink:0}
 .ov-acts .btn-sm{padding:5px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
-.g-sel{width:18px;height:18px;min-width:18px;accent-color:#f1bfbc;margin:0;align-self:flex-start;margin-top:10px}
+.g-sel{width:20px;height:20px;min-width:20px;accent-color:#f1bfbc;margin:0;align-self:center;cursor:pointer}
 .g-sum{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;padding:10px 12px;background:var(--line);border-radius:12px;font-size: calc(13px * var(--fs))}
 .g-sum b{font-weight:700}
 .g-sum .sub{margin-left:auto;color:var(--sub)}
@@ -408,14 +408,14 @@ const DEF={
   incomeCats:['工资','兼职','理财','红包','其他'],
   expenseCats:['餐饮','交通','购物','居家','医疗','其他'],
   moodCats:['娱乐','美妆','奶茶咖啡','游戏','宠爱自己','其他'],
+  catIcons:{},
   chat:[],
   weights:[],
   dietGoal:{targetWeight:0,startWeight:0,height:0,targetKcal:0}
 };
 /* 排班班次类型（沿用四色规范 + 中性灰，保持低视觉干扰） */
 const SHIFT_TYPES=[
-  {key:'早班',color:'#c4f3f0'},
-  {key:'午班',color:'#dcf7d8'},
+  {key:'白班',color:'#c4f3f0'},
   {key:'晚班',color:'#f1bfbc'},
   {key:'夜班',color:'#cdb4e0'},
   {key:'休息',color:'#ececec'},
@@ -1057,7 +1057,7 @@ function toast(t){const el=$('#toast');el.textContent=t;el.classList.add('show')
 function balances(){
   const b={save:0,daily:0,mood:0};
   S.incomes.forEach(i=>{b.save+=Number(i.alloc.save)||0;b.daily+=Number(i.alloc.daily)||0;b.mood+=Number(i.alloc.mood)||0;});
-  S.expenses.forEach(e=>{b[e.account]-=Number(e.amount)||0;});
+  S.expenses.forEach(e=>{const fs=Number(e.fromSave)||0;const amt=Number(e.amount)||0;if(e.account in b)b[e.account]-=(amt-fs);b.save-=fs;});
   S.gifts.forEach(g=>{const a=Number(g.amount)||0;b.save+= g.type==='out'?-a:a;});
   return b;
 }
@@ -1065,9 +1065,15 @@ function monthBalances(){
   const m=today().slice(0,7);
   const b={save:0,daily:0,mood:0};
   S.incomes.forEach(i=>{if((i.date||'').slice(0,7)!==m)return;b.save+=Number(i.alloc.save)||0;b.daily+=Number(i.alloc.daily)||0;b.mood+=Number(i.alloc.mood)||0;});
-  S.expenses.forEach(e=>{if((e.date||'').slice(0,7)!==m)return;b[e.account]-=Number(e.amount)||0;});
+  S.expenses.forEach(e=>{if((e.date||'').slice(0,7)!==m)return;const fs=Number(e.fromSave)||0;const amt=Number(e.amount)||0;if(e.account in b)b[e.account]-=(amt-fs);b.save-=fs;});
   S.gifts.forEach(g=>{if((g.date||'').slice(0,7)!==m)return;const a=Number(g.amount)||0;b.save+=g.type==='out'?-a:a;});
   return b;
+}
+function computeFromSave(account, amount){
+  if(account==='save') return 0;
+  const b=balances();
+  const avail=Math.max(0, Number(b[account])||0);
+  return Math.max(0, Number(amount)-avail);
 }
 function todayFlow(){
   const t=today();let inc=0,exp=0,moodExp=0,dailyExp=0;
@@ -1908,7 +1914,7 @@ function cmdCreate(){
     const amt=parseFloat($('#pvAmt').value)||p.amount;
     const cat=($('#pvCat').value.trim())||p.category||'其他';
     const date=($('#pvDate').value)||p.date||today();
-    S.expenses.push({id:uid(),ts:Date.now(),date,amount:amt,account:'日常',category:cat,note:p.title||'',img:''});
+    S.expenses.push({id:uid(),ts:Date.now(),date,amount:amt,account:'日常',fromSave:computeFromSave('daily',amt),category:cat,note:p.title||'',img:''});
     commit();toast('💸 支出已记录');
   }else if(p.intent==='income'){
     const amt=parseFloat($('#pvAmt').value)||p.amount;
@@ -1983,7 +1989,7 @@ function taskAlarmHTML(t){
 <script>
 /* ================= Tab4 账目 ================= */
 const CAT_IC={'餐饮':'🍜','交通':'🚌','购物':'🛍','居家':'🏡','医疗':'💊','娱乐':'🎮','美妆':'💄','奶茶咖啡':'🧋','游戏':'🕹','宠爱自己':'💝','工资':'💼','兼职':'🧑‍💻','理财':'📈','红包':'🧧','其他':'📦'};
-const catIc=c=>CAT_IC[c]||'📦';
+const catIc=c=>(S&&S.catIcons&&S.catIcons[c])||CAT_IC[c]||'📦';
 function billRow(e){
   const isMood=e.account==='mood';
   return `
@@ -1991,7 +1997,7 @@ function billRow(e){
     <input type="checkbox" class="g-sel" ${expSel[e.id]?'checked':''} onclick="event.stopPropagation();toggleExpSel('${e.id}')">
     <div class="bill-ic" style="${isMood?'background:#fdeeed':''}">${catIc(e.category)}</div>
     <div class="grow">
-      <div style="font-size:calc(14.5px * var(--fs));font-weight:500">${esc(e.category)}${isMood?' <span class="chip coral">✨</span>':''}${e.img?' 🖼':''}</div>
+      <div style="font-size:calc(14.5px * var(--fs));font-weight:500">${esc(e.category)}${isMood?' <span class="chip coral">✨</span>':''}${Number(e.fromSave)>0?' <span class="chip" style="background:var(--aqua)">🏦'+fmt(e.fromSave)+'</span>':''}${e.img?' 🖼':''}</div>
       <div class="sub">${esc(e.date)}${e.note?' · '+esc(e.note):''}</div>
     </div>
     <div class="${isMood?'':'amt-out'}" style="${isMood?'color:#f1bfbc;font-weight:700':''}">-¥${fmt(e.amount)}</div>
@@ -2037,7 +2043,7 @@ function filterExpMonth(v){
 function expCurrentSet(){
   const sel=Object.keys(expSel).filter(id=>expSel[id]);
   const toInc=i=>({kind:'income',id:i.id,amt:Number(i.total)||0,account:'收入',category:i.category,date:i.date,note:i.note});
-  const toExp=e=>({kind:'expense',id:e.id,amt:-(Number(e.amount)||0),account:e.account==='mood'?'心情':'日常',category:e.category,date:e.date,note:e.note});
+  const toExp=e=>({kind:'expense',id:e.id,amt:-(Number(e.amount)||0),account:e.account==='mood'?'心情':'日常',category:e.category,date:e.date,note:e.note,fromSave:Number(e.fromSave)||0});
   let set,mode;
   if(sel.length){
     const ids=new Set(sel);
@@ -2069,15 +2075,36 @@ function expSummaryHTML(){
     <span>净额 <b style="color:${net>=0?'#3aa79f':'#e0908b'}">${net>=0?'+':''}${fmt(net)}</b></span>
     <span class="sub">${set.length} 笔 · ${mode}</span>
     <button class="btn-sm" onclick="exportExpSet()">导出明细</button>
-    ${mode==='已勾选'?`<button class="btn-sm" onclick="clearExpSel()">清空</button>`:''}
+    ${mode==='已勾选'?`<button class="btn-sm" style="background:#fdeeed;color:#d96b66;border-color:#f1bfbc" onclick="delExpSel()">🗑 删除选中</button><button class="btn-sm" onclick="clearExpSel()">取消选择</button>`:''}
   </div>`;
 }
 function exportExpSet(){
   const {set,mode}=expCurrentSet();
   if(!set.length){toast('没有可导出的记录');return;}
-  const rows=set.map(x=>[x.kind==='income'?'收入':'支出',x.account,x.category,x.date,(x.amt>=0?'+':'-')+fmt(Math.abs(x.amt)),x.note||'']);
-  downloadExcel('PersonalOS-收支-'+(mode==='全部账单'?'全部':mode.replace(/[「」]/g,''))+'-'+today(),['类型','账户','分类','日期','金额','备注'],rows);
+  const rows=set.map(x=>[x.kind==='income'?'收入':'支出',x.account,x.category,x.date,(x.amt>=0?'+':'-')+fmt(Math.abs(x.amt)),x.note||'',x.kind==='income'?'':('¥'+fmt(x.fromSave||0))]);
+  downloadExcel('PersonalOS-收支-'+(mode==='全部账单'?'全部':mode.replace(/[「」]/g,''))+'-'+today(),['类型','账户','分类','日期','金额','备注','溢出扣存钱'],rows);
   toast('已导出 '+set.length+' 条记录');
+}
+function delExpSel(){
+  const sel=Object.keys(expSel).filter(id=>expSel[id]);
+  if(!sel.length){toast('请先勾选要删除的记录');return;}
+  const n=sel.length;
+  openModal(`<h3>删除确认 <button class="x" onclick="closeModal()">✕</button></h3>
+    <p style="font-size:calc(14.5px * var(--fs));line-height:1.7;margin:6px 0 2px">确定删除选中的 <b style="color:#e0908b">${n}</b> 条记录吗？<br>
+    <span class="sub">收入将自动回滚余额，支出将自动返还余额，此操作不可撤销。</span></p>
+    <div class="grid2 mt16">
+      <button class="btn btn-ghost" onclick="closeModal()">再想想</button>
+      <button class="btn btn-coral" onclick="doDelExpSel()">确认删除</button>
+    </div>`);
+}
+function doDelExpSel(){
+  const sel=Object.keys(expSel).filter(id=>expSel[id]);
+  const ids=new Set(sel);
+  let inc=0,exp=0;
+  S.incomes=S.incomes.filter(x=>{if(ids.has(x.id)){inc++;return false;}return true;});
+  S.expenses=S.expenses.filter(x=>{if(ids.has(x.id)){exp++;return false;}return true;});
+  expSel={};closeModal();commit();
+  toast('已删除 '+(inc+exp)+' 条记录，余额已自动处理');
 }
 function saveDetails(){
   const rows=[];
@@ -2206,6 +2233,7 @@ function acctRows(acc){
   if(acc==='save'){
     S.incomes.forEach(i=>{const a=Number(i.alloc&&i.alloc.save)||0;if(i.date&&a)rows.push({id:'inc:'+i.id,ts:i.ts||0,date:i.date,cat:i.category,note:i.note,amt:a,kind:'收入·存钱'});});
     S.gifts.forEach(g=>{const a=Number(g.amount)||0;rows.push({id:'gift:'+g.id,ts:g.ts||0,date:g.date,cat:g.event||'',note:(g.name||'')+(g.relation?'（'+g.relation+'）':''),amt:g.type==='out'?-a:a,kind:g.type==='in'?'收到份子':'送出份子'});});
+    S.expenses.forEach(e=>{const fs=Number(e.fromSave)||0;if(fs>0)rows.push({id:e.id,ts:e.ts||0,date:e.date,cat:'支出溢出·'+e.category,note:e.note,amt:-fs,kind:'溢出扣存钱'});});
   }else if(acc==='daily'){
     S.expenses.filter(e=>e.account==='daily').forEach(e=>rows.push({id:e.id,ts:e.ts||0,date:e.date,cat:e.category,note:e.note,amt:-(Number(e.amount)||0),kind:'日常支出'}));
   }else if(acc==='mood'){
@@ -2558,7 +2586,7 @@ function openDayShifts(ds){
     </div>`);
 }
 function openShiftModal(ds,id){
-  const e=id?S.shifts.find(x=>x.id===id):null,sel=e?e.type:'早班';
+  const e=id?S.shifts.find(x=>x.id===id):null,sel=e?e.type:'白班';
   const sdt=(e&&e.sdate)?(e.sdate+'T'+(e.stime||'00:00')):'';
   const edt=(e&&e.edate)?(e.edate+'T'+(e.etime||'00:00')):'';
   openModal(`<h3>${e?'编辑班次':'添加班次'} <button class="x" onclick="closeModal()">✕</button></h3>
@@ -2588,7 +2616,7 @@ function saveShift(id){
   let edate=sdate,etime='';
   if(ev){const p=ev.split('T');edate=p[0]||sdate;etime=p[1]||'';}
   if(edate<sdate){edate=sdate;etime='';}
-  const rec={sdate,stime,edate,etime,type:window._shType||'早班',note:$('#shNote').value.trim(),img:window._shImg||'',date:sdate,start:stime,end:etime};
+  const rec={sdate,stime,edate,etime,type:window._shType||'白班',note:$('#shNote').value.trim(),img:window._shImg||'',date:sdate,start:stime,end:etime};
   if(id){const i=S.shifts.findIndex(x=>x.id===id);if(i>=0)S.shifts[i]=Object.assign(S.shifts[i],rec);}else S.shifts.push(Object.assign({id:uid()},rec));
   window._shImg='';closeModal();commit();toast(id?'班次已更新':'班次已添加');
 }
@@ -2596,9 +2624,9 @@ function delShift(id,ds){S.shifts=S.shifts.filter(x=>x.id!==id);commit();openDay
 /* 批量导入（文本解析 + 可选图片附件） */
 function importShiftModal(scope){
   openModal(`<h3>📥 批量导入排班 <button class="x" onclick="closeModal()">✕</button></h3>
-    <p class="sub">粘贴识别文字或手动输入，每行一条，如：7/1 早班 09:00-18:00。也可附一张排班截图作为凭证。</p>
+    <p class="sub">粘贴识别文字或手动输入，每行一条，如：7/1 白班 09:00-18:00。也可附一张排班截图作为凭证。</p>
     <div class="f-label">识别文本 / 手动输入</div>
-    <textarea id="shImpText" placeholder="7/1 早班 09:00-18:00&#10;7/2 晚班 14:00-22:00&#10;7/3 休息"></textarea>
+    <textarea id="shImpText" placeholder="7/1 白班 09:00-18:00&#10;7/2 晚班 14:00-22:00&#10;7/3 休息"></textarea>
     <div class="f-label mt8">排班截图（可选，作为凭证）</div>
     <input id="shImpImg" type="file" accept="image/*" onchange="shImportPreview(this)">
     <div id="shImpPrev">${window._shImpImg?`<img src="${window._shImpImg}" class="img-prev">`:''}</div>
@@ -2624,13 +2652,13 @@ function parseShiftText(txt,monthPrefix){
     .replace(/(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})/g,'')
     .replace(/(\d{1,2})[-/.月](\d{1,2})/g,'')
     .replace(/[年月日]/g,'')
-    .replace(/早班|午班|晚班|夜班|休息|培训|会议|值班|班/g,'')
+    .replace(/白班|晚班|夜班|休息|培训|会议|值班|班/g,'')
     .replace(/[-~–至到:]/g,' ')
     .replace(/\s+/g,' ').trim();
   const pushRange=(sy,sm,sd,st,em,ed,et,raw)=>{
     const sdate=sy+'-'+String(sm).padStart(2,'0')+'-'+String(sd).padStart(2,'0');
     const edate=sy+'-'+String(em).padStart(2,'0')+'-'+String(ed).padStart(2,'0');
-    let type='早班';for(const t of SHIFT_TYPES){if(raw.includes(t.key)){type=t.key;break;}}
+    let type='白班';for(const t of SHIFT_TYPES){if(raw.includes(t.key)){type=t.key;break;}}
     const note=cleanNote(raw.replace(RE_FULL,'').replace(RE_SHORT,''));
     out.push({date:sdate,sdate,stime:st,edate,etime:et,type,note,img:''});
   };
@@ -2645,7 +2673,7 @@ function parseShiftText(txt,monthPrefix){
     else{const p=line.match(/(\d{1,2})[-/.月](\d{1,2})/);if(p){mm=+p[1];dd=+p[2];}}
     if(!dd)return;
     const date=yy+'-'+String(mm).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
-    let type='早班';for(const t of SHIFT_TYPES){if(line.includes(t.key)){type=t.key;break;}}
+    let type='白班';for(const t of SHIFT_TYPES){if(line.includes(t.key)){type=t.key;break;}}
     let start='',end='';const tm=line.match(/(\d{1,2}):?(\d{2})?\s*[-~–至到]\s*(\d{1,2}):?(\d{2})?/);
     if(tm){start=String(tm[1]).padStart(2,'0')+':'+(tm[2]||'00');end=String(tm[3]).padStart(2,'0')+':'+(tm[4]||'00');}
     else{const t2=line.match(/(\d{1,2}):(\d{2})/);if(t2)start=t2[1].padStart(2,'0')+':'+t2[2];}
@@ -2655,7 +2683,7 @@ function parseShiftText(txt,monthPrefix){
   return out;
 }
 function applyShiftImport(arr,monthPrefix,img){
-  arr=(arr||[]).filter(x=>x&&x.sdate).map(x=>({id:uid(),sdate:String(x.sdate).slice(0,10),stime:x.stime||'',edate:String(x.edate||x.sdate).slice(0,10),etime:x.etime||'',type:SHIFT_TYPES.find(t=>t.key===x.type)?x.type:'早班',note:x.note||'',img:img||'',date:String(x.sdate).slice(0,10),start:x.stime||'',end:x.etime||''}));
+  arr=(arr||[]).filter(x=>x&&x.sdate).map(x=>({id:uid(),sdate:String(x.sdate).slice(0,10),stime:x.stime||'',edate:String(x.edate||x.sdate).slice(0,10),etime:x.etime||'',type:SHIFT_TYPES.find(t=>t.key===x.type)?x.type:'白班',note:x.note||'',img:img||'',date:String(x.sdate).slice(0,10),start:x.stime||'',end:x.etime||''}));
   if(!arr.length){toast('没有解析到排班，换种写法试试？');return;}
   S.shifts.push(...arr);window._shImpImg='';closeModal();commit();toast('已导入 '+arr.length+' 条排班');
 }
@@ -2740,7 +2768,7 @@ function doImportBills(){
     if(it.dir==='income'){
       S.incomes.push({id:uid(),ts:Date.now(),date:it.date,total:it.amt,alloc:{save:0,daily:it.amt,mood:0},category:it.cat,note,img:'',extId:it.extId||''});
     }else{
-      S.expenses.push({id:uid(),ts:Date.now(),date:it.date,amount:it.amt,account:acct,category:it.cat,note,img:'',extId:it.extId||''});
+      S.expenses.push({id:uid(),ts:Date.now(),date:it.date,amount:it.amt,account:acct,fromSave:computeFromSave(acct,it.amt),category:it.cat,note,img:'',extId:it.extId||''});
     }
     if(it.extId)existExt.add(it.extId);
     nAdd++;
@@ -2983,7 +3011,7 @@ function chooseQuickIcon(e){
 
 function exportAllBills(){
   const toInc=i=>({kind:'income',amt:Number(i.total)||0,account:'收入',category:i.category||'',date:i.date||'',note:i.note||''});
-  const toExp=e=>({kind:'expense',amt:-(Number(e.amount)||0),account:e.account==='mood'?'心情':'日常',category:e.category||'',date:e.date||'',note:e.note||''});
+  const toExp=e=>({kind:'expense',amt:-(Number(e.amount)||0),account:e.account==='mood'?'心情':'日常',category:e.category||'',date:e.date||'',note:e.note||'',fromSave:Number(e.fromSave)||0});
   const set=[...S.incomes.map(toInc),...S.expenses.map(toExp)];
   if(!set.length){toast('还没有账单记录');return;}
   set.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
@@ -3219,17 +3247,47 @@ function catPicker(idPrefix,cats,sel){
 }
 function pickCat(p,btn){document.querySelectorAll('#'+p+'Wrap .cat-item').forEach(b=>b.classList.remove('on'));btn.classList.add('on');}
 function addCat(p){
-  const name=prompt('新分类名称');if(!name||!name.trim())return;
+  const ov=document.createElement('div');
+  ov.className='modal-mask';ov.id='addCatOverlay';ov.style.zIndex='85';
+  ov.innerHTML=`<div class="modal">
+    <h3>➕ 新增分类 <button class="x" onclick="closeAddCat()">✕</button></h3>
+    <div class="f-label">分类名称</div>
+    <input id="newCatName" placeholder="如：旅行、学习" maxlength="20">
+    <div class="f-label">选择图标</div>
+    <div class="emoji-grid" id="newCatEmojiGrid">${EMOJIS.map(e=>`<button type="button" class="emoji-cell" onclick="pickNewCatEmoji('${e}',this)">${e}</button>`).join('')}</div>
+    <div class="f-label">或输入任意 emoji（粘贴 / 手输）</div>
+    <input id="newCatEmojiCustom" placeholder="🙂" maxlength="4" style="text-align:center;font-size:calc(20px * var(--fs))">
+    <div class="grid2 mt16">
+      <button class="btn btn-ghost" onclick="closeAddCat()">取消</button>
+      <button class="btn btn-coral" onclick="confirmAddCat('${p}')">保存</button>
+    </div>
+  </div>`;
+  ov.setAttribute('onclick',"if(event.target===this)closeAddCat()");
+  $('#modalRoot').appendChild(ov);
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  setTimeout(()=>{const i=$('#newCatName');if(i)i.focus();},250);
+}
+function closeAddCat(){const ov=$('#addCatOverlay');if(!ov)return;ov.classList.remove('show');setTimeout(()=>ov.remove(),200);}
+function pickNewCatEmoji(e,btn){
+  const c=$('#newCatEmojiCustom');if(c)c.value=e;
+  document.querySelectorAll('#newCatEmojiGrid .emoji-cell').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+}
+function confirmAddCat(p){
+  const name=($('#newCatName').value||'').trim();
+  if(!name){toast('请输入分类名称');return;}
+  const icon=($('#newCatEmojiCustom').value||'').trim()||'📦';
   const map={inc:'incomeCats',exp:'expenseCats',mood:'moodCats'};
   const arr=S[map[p]];
-  if(!arr.includes(name.trim()))arr.splice(arr.length-1,0,name.trim());
+  if(!arr.includes(name)){
+    const idx=arr.indexOf('其他');
+    if(idx>=0)arr.splice(idx,0,name);else arr.push(name);
+  }
+  S.catIcons=Object.assign({},S.catIcons||{},{[name]:icon});
   save();
-  const wrap=$('#'+p+'Wrap');
-  const btn=document.createElement('button');
-  btn.className='cat-item on';btn.dataset.c=name.trim();btn.textContent='📦 '+name.trim();
-  btn.onclick=function(){pickCat(p,this);};
-  document.querySelectorAll('#'+p+'Wrap .cat-item').forEach(b=>b.classList.remove('on'));
-  wrap.insertBefore(btn,wrap.lastElementChild);
+  const box={inc:'incCatBox',exp:'expCatBox',mood:'moodCatBox'}[p];
+  const c=$('#'+box);if(c)c.innerHTML=catPicker(p,S[map[p]],name);
+  closeAddCat();toast('已新增 '+icon+' '+name);
 }
 function selCat(p){const b=document.querySelector('#'+p+'Wrap .cat-item.on');return b?b.dataset.c:'其他';}
 function openIncomeModal(){
@@ -3244,7 +3302,7 @@ function openIncomeModal(){
     </div>
     <div id="remainTip" class="sub mt8" style="text-align:right">未分配：0.00</div>
     <div class="f-label">收入分类</div>
-    ${catPicker('inc',S.incomeCats,'工资')}
+    <div id="incCatBox">${catPicker('inc',S.incomeCats,'工资')}</div>
     <div class="f-label">日期</div><input id="incDate" type="date" value="${today()}">
     <div class="f-label">备注（可选）</div><input id="incNote" placeholder="备注">
     <div class="f-label">图片凭证（可选）</div><input id="incImg" type="file" accept="image/*">
@@ -3298,9 +3356,11 @@ function saveExpense(){
   const amt=Number($('#expAmt').value)||0;if(amt<=0){toast('请填写金额');return;}
   const acct=window._acct;
   readImg($('#expImg'),img=>{
-    S.expenses.push({id:uid(),ts:Date.now(),date:$('#expDate').value||today(),amount:amt,account:acct,category:acct==='daily'?selCat('exp'):selCat('mood'),note:$('#expNote').value.trim(),img});
+    const fromSave=computeFromSave(acct,amt);
+    S.expenses.push({id:uid(),ts:Date.now(),date:$('#expDate').value||today(),amount:amt,account:acct,fromSave,category:acct==='daily'?selCat('exp'):selCat('mood'),note:$('#expNote').value.trim(),img});
     closeModal();commit();
-    toast(acct==='daily'?'已从日常账户扣款':'已从心情账户扣款 ✨');
+    if(fromSave>0)toast('「'+(acct==='daily'?'日常':'心情')+'」余额不足，超出 ¥'+fmt(fromSave)+' 已从🏦存钱扣除');
+    else toast(acct==='daily'?'已从日常账户扣款':'已从心情账户扣款 ✨');
   });
 }
 
@@ -3354,6 +3414,7 @@ function openBillDetail(kind,id){
   } else {
     x=S.expenses.find(i=>i.id===id);
     rows=[['账户',x.account==='mood'?'✨ 为心情买单':'🧾 日常支出'],['金额','¥'+fmt(x.amount)],['分类',x.category],['日期',x.date],['备注',x.note||'—']];
+    if(Number(x.fromSave)>0)rows.push(['其中从🏦存钱扣除','¥'+fmt(x.fromSave)]);
   }
   if(!x)return;
   openModal(`<h3>账单详情 <button class="x" onclick="closeModal()">✕</button></h3>
