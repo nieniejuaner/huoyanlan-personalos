@@ -133,7 +133,7 @@ textarea{resize:none;min-height:72px}
 .bill-ic{width:34px;height:34px;min-width:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size: calc(16px * var(--fs));background:var(--line)}
 .ov-acts{display:flex;gap:6px;flex-shrink:0}
 .ov-acts .btn-sm{padding:5px 10px;border-radius:10px;border:1px solid var(--line);background:var(--card)}
-.g-sel{width:20px;height:20px;min-width:20px;accent-color:#f1bfbc;margin:0;align-self:center;cursor:pointer}
+.g-sel{width:20px;height:20px;min-width:20px;flex:none;accent-color:#f1bfbc;margin:0;padding:0;box-sizing:border-box;align-self:center;cursor:pointer}
 .g-sum{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;padding:10px 12px;background:var(--line);border-radius:12px;font-size: calc(13px * var(--fs))}
 .g-sum b{font-weight:700}
 .g-sum .sub{margin-left:auto;color:var(--sub)}
@@ -3720,7 +3720,7 @@ if('serviceWorker' in navigator){
       reg.addEventListener('updatefound',function(){
         var n=reg.installing;
         n.addEventListener('statechange',function(){
-          if(n.state==='installed' && navigator.serviceWorker.controller){swShowUpdate();}
+          if(n.state==='installed' && navigator.serviceWorker.controller){swShowUpdate(); n.postMessage('skip');}
         });
       });
     }).catch(function(){});
